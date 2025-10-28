@@ -151,24 +151,33 @@ router.post('/view/Candidates',UserC.viewCandidatesForUserElection);
 
 /**
  * @swagger
- * /api/users/voting/history:
+ * /api/users/voting/history/{userId}:
  *   get:
  *     summary: Get voting history for a user
  *     tags: [User]
  *     parameters:
- *       - in: query
+ *       - in: path
  *         name: userId
  *         required: true
  *         schema:
  *           type: integer
- *         description: User ID
+ *         description: ID of the user whose voting history is to be fetched
  *     responses:
  *       200:
- *         description: Voting history returned
+ *         description: Voting history returned successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: array
+ *               items:
+ *                 type: object
+ *       400:
+ *         description: Missing or invalid user ID
  *       500:
  *         description: Failed to fetch voting history
  */
-router.get('/voting/history',UserC.votingHistory);
+
+router.get('/voting/history/:userId',UserC.votingHistory);
 /**
  * @swagger
  * /api/users/cast/vote:

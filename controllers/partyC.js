@@ -35,7 +35,6 @@ class Parties {
   async createParty(req, res) {
     try {
       const imageUrl = req.file.path; 
-      console.log(imageUrl)
       const { name, abbreviation, email, password } = req.body;
       let hashedpass=bcrypt.hash(password,10)
       await partyM.createParty(name, abbreviation, imageUrl,email,hashedpass);

@@ -7,7 +7,7 @@ class candConstM {
             id SERIAL PRIMARY KEY,
             candidateId INTEGER REFERENCES candidate(id),
             totalVotes INTEGER DEFAULT 0,
-            approvalStatus VARCHAR(20) CHECK (approvalStatus IN ('Pending', 'Taken', 'Vacated', 'Lost')) DEFAULT 'Pending',
+            approvalStatus VARCHAR(20) CHECK (approvalStatus IN ('Pending', 'Won' , 'Lost')) DEFAULT 'Pending',
             constituencyId INTEGER REFERENCES Constituency(id),
             electionId INTEGER REFERENCES elections(id),
             UNIQUE(candidateId, constituencyId,electionId));`;
@@ -65,5 +65,33 @@ class candConstM {
       throw err;
     }
   }
+  async ChooseSeat(candidateId, electionId, constituencyId) {
+    try {
+      // Get all wins
+      const { rows: wins } = await db.query(
+        `SELECT id, constituencyId FROM candidateConstituency 
+         WHERE candidateId = $1 AND electionId = $2 AND approvalStatus = 'Won'`,
+        [candidateId, electionId]
+      );
+  
+      if (wins.length <= 1)
+        return res.status(200).json({ message: "Only one or no seat won, nothing to remove" });
+  
+      // Remove other seats
+      await db.query(
+        `DELETE FROM candidateConstituency 
+         WHERE candidateId = $1 AND electionId = $2 AND constituencyId != $3 AND resultStatus = 'Won'`,
+        [candidateId, electionId, constituencyId]
+      );
+  
+      res.status(200).json({
+        message: "Seat confirmed — other winning seats removed",
+        keptSeat: constituencyId
+      });
+    } catch (err) {
+      console.error(err);
+      res.status(500).json({ message: "Error choosing seat", error: err.message });
+  }
+    }
 }
 export default new candConstM();

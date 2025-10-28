@@ -24,7 +24,7 @@ getConstituencies = async (req, res) => {
 }
 getAreaByConstituency = async (req, res) => {
   try {
-    const {constituencyid} = req.query;
+    const {constituencyid} = req.params;
     const constituency = await ConstituencyM.getAreaByConstituency(constituencyid);
     return res.json(constituency);
   } catch (err) {

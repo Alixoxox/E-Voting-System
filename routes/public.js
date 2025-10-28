@@ -176,20 +176,20 @@ router.get('/province', ProvinceC.getProvinces);
 router.get('/constituencies', ConstituencyC.getConstituencies);
 /**
  * @swagger
- * /api/public/constituency/area:
+ * /api/public/constituency/area/{constituencyid}:
  *   get:
  *     summary: Get areas by Constituency ID
  *     tags: [Public]
  *     parameters:
- *       - in: query
+ *       - in: path
  *         name: constituencyid
  *         required: true
  *         schema:
  *           type: integer
- *         description: ID of the constituency to fetch its holding constituencies
+ *         description: ID of the constituency to fetch its areas
  *     responses:
  *       200:
- *         description: Constituencies retrieved successfully
+ *         description: Areas retrieved successfully
  *         content:
  *           application/json:
  *             schema:
@@ -197,11 +197,12 @@ router.get('/constituencies', ConstituencyC.getConstituencies);
  *               items:
  *                 type: object
  *       400:
- *         description: Missing or invalid area ID
+ *         description: Missing or invalid constituency ID
  *       500:
- *         description: Server error while fetching constituencies
+ *         description: Server error while fetching areas
  */
-router.get('/constituency/area', ConstituencyC.getAreaByConstituency);
+
+router.get('/constituency/area/:constituencyid', ConstituencyC.getAreaByConstituency);
 
 /**
  * @swagger

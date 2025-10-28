@@ -31,13 +31,13 @@ class candidateM{
             throw err;
         }
     }
-    async createCandidate(name,email, cnic, password, province, city, area, partyId, manifesto){
+    async createCandidate(name,email, cnic, password, province, city, area, partyId, manifesto,imageUrl){
         try{
             let result=await db.query(`SELECT id FROM users WHERE email = $1`, [email]);
             if(result.rows.length === 0){
                 await userM.createUser(name, email, cnic, password, province, city, area, 'candidate');
             }
-            await db.query(`INSERT INTO candidate (userId, partyId, manifesto) VALUES ($1, $2, $3)`, [result.rows[0].id, partyId, manifesto]);
+            await db.query(`INSERT INTO candidate (userId, partyId, manifesto,imageUrl) VALUES ($1, $2, $3, $4)`, [result.rows[0].id, partyId, manifesto,imageUrl]);
             
         }catch(err){
             console.error('Error creating candidate:', err);
@@ -54,6 +54,14 @@ class candidateM{
             return result.rows;
         }catch(err){
             console.error('Error fetching candidates by party ID:', err);
+            throw err;
+        }
+    }
+    async kickCandidate(candidateId, partyId){
+        try{
+            await db.query(`DELETE FROM candidate WHERE id = $1 AND partyId = $2`, [candidateId, partyId]);
+        }catch(err){
+            console.error('Error kicking candidate:', err);
             throw err;
         }
     }

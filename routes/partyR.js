@@ -15,18 +15,18 @@ const upload = multer({ dest: 'uploads/' }); // temporary storage
  */
 /**
  * @swagger
- * /api/parties/candidates/fighting/elections:
+ * /api/parties/{partyId}/candidates/fighting/elections/{electionId}:
  *   get:
  *     summary: Get all candidates with their fighting constituencies for a specific party and election
  *     tags: [Parties]
  *     parameters:
- *       - in: query
+ *       - in: path
  *         name: partyId
  *         schema:
  *           type: integer
  *         required: true
  *         description: Party ID to filter candidates
- *       - in: query
+ *       - in: path
  *         name: electionId
  *         schema:
  *           type: integer
@@ -53,39 +53,54 @@ const upload = multer({ dest: 'uploads/' }); // temporary storage
  *       500:
  *         description: Server error
  */
-
-router.get('/candidates/fighting/elections', candidateConstituencyC.getCandConstByPartyAndElection);
+router.get('/:partyId/candidates/fighting/elections/:electionId', candidateConstituencyC.getCandConstByPartyAndElection);
 /**
  * @swagger
- * /api/parties/candidates:
+ * /api/parties/{partyId}/candidates:
  *   get:
- *     summary: Get all registered candidates wrt their parties
+ *     summary: Get all registered candidates for a specific party
  *     tags: [Parties]
  *     parameters:
- *       - in: query
+ *       - in: path
  *         name: partyId
  *         schema:
  *           type: integer
- *         required: false
- *         description: Filter candidates by their parties
+ *         required: true
+ *         description: ID of the party
  *     responses:
  *       200:
- *         description: List of all candidates
+ *         description: List of candidates for the specified party
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: array
+ *               items:
+ *                 type: object
+ *                 properties:
+ *                   candidateId:
+ *                     type: integer
+ *                   name:
+ *                     type: string
+ *                   constituency:
+ *                     type: string
+ *       400:
+ *         description: Invalid party ID
  *       500:
  *         description: Server error
  */
-
-router.get('/candidates', CandidateC.getCandidates);
+router.get('/:partyId/candidates', CandidateC.getCandidatesByPartyId);
 /**
  * @swagger
  * /api/parties/create/candidate:
  *   post:
  *     summary: Create a new candidate
  *     tags: [Parties]
+ *     consumes:
+ *       - multipart/form-data
  *     requestBody:
  *       required: true
  *       content:
- *         application/json:
+ *         multipart/form-data:
  *           schema:
  *             type: object
  *             properties:
@@ -104,6 +119,9 @@ router.get('/candidates', CandidateC.getCandidates);
  *                 properties:
  *                   partyId: { type: integer }
  *                   manifesto: { type: string }
+ *               image:
+ *                 type: string
+ *                 format: binary
  *     responses:
  *       200:
  *         description: Candidate created successfully
@@ -112,7 +130,36 @@ router.get('/candidates', CandidateC.getCandidates);
  *       500:
  *         description: Server error
  */
-router.post('/create/candidate', CandidateC.CreateCandidate);
+router.post('/create/candidate',upload.single('image'), CandidateC.CreateCandidate);
+/**
+ * @swagger
+ * /api/parties/{partyId}/kick/candidate/{candidateId}:
+ *   delete:
+ *     summary: Remove a candidate from a specific party
+ *     tags: [Parties]
+ *     parameters:
+ *       - in: path
+ *         name: partyId
+ *         schema:
+ *           type: integer
+ *         required: true
+ *         description: ID of the party
+ *       - in: path
+ *         name: candidateId
+ *         schema:
+ *           type: integer
+ *         required: true
+ *         description: ID of the candidate to remove
+ *     responses:
+ *       200:
+ *         description: Candidate removed successfully
+ *       400:
+ *         description: Invalid party or candidate ID
+ *       500:
+ *         description: Server error
+ */
+
+router.delete('/:partyId/kick/candidate/:candidateId', CandidateC.kickCandidate);
 /**
  * @swagger
  * /api/parties/account/register:
@@ -218,4 +265,7 @@ router.post('/account/signin', Parties.LoginParty);
  *         description: Server error
  */
 router.post('/candidate/fighting/constituency', candidateConstituencyC.BookConstituencSeatForElectionForCandidate);
+
+
+
 export default router;

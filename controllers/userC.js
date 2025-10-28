@@ -56,7 +56,7 @@ async CastVote(req,res){
 
 async votingHistory(req,res){
 try{
-  const {userId}=req.query;
+  const {userId}=req.params;
   console.log(userId);
   const votingHistory=await UserM.votingHistory(userId);
   return res.json(votingHistory);

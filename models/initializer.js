@@ -9,7 +9,6 @@ import ProvinceM from '../models/ProvinceM.js';
 import UserM from '../models/userM.js';
 import votesM from "../models/votesM.js";
 import constituencyArea from "./constituencyArea.js";
-import ElectionResulM from "./ElectionResults.js";
 export async function initTables() {
     await UserM.createTable();
     await ProvinceM.createTable();
@@ -22,5 +21,4 @@ export async function initTables() {
     await candConstM.createTable();
     await votesM.createTable();
     await constituencyArea.createTable();
-    await ElectionResulM.createTable();
   }
