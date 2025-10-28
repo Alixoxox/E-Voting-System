@@ -1,0 +1,7 @@
+code,name,seatType,areas
+PS-101,Karachi East-I,provisional,"Gulshan-e-Iqbal,Gulistan-e-Jauhar,PECHS"
+PS-102,Karachi South-I,provisional,"Clifton,Saddar,Lyari"
+PS-103,Hyderabad-I,provisional,"Latifabad,Qasimabad"
+NA-240,Karachi East,national,"Gulshan-e-Iqbal,Gulistan-e-Jauhar"
+NA-241,Karachi South,national,"Clifton,Lyari,Saddar"
+NA-242,Hyderabad,national,"Latifabad,Qasimabad"

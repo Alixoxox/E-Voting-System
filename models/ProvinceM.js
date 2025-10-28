@@ -1,0 +1,49 @@
+import db from '../config/db.js';
+class ProvinceM{
+    async createTable(){
+        try{
+            const sql=`
+            CREATE TABLE IF NOT EXISTS province(
+            id SERIAL PRIMARY KEY,
+            name VARCHAR(100) NOT NULL UNIQUE);`
+            await db.query(sql);
+            console.log('Province table created or already exists.');
+        }catch(err){
+            console.error('Error creating Province table:', err);
+        }
+    }
+    async getAllProvinces(){
+        try{
+            const sql=`SELECT * FROM province;`;
+            const result=await db.query(sql);
+            return result.rows;
+        }catch(err){
+            console.error('Error fetching provinces:', err);
+            throw err;
+        }
+    }
+    async AddProvinceCsv(provinces){
+        try {
+          const values = [];
+          const rows = [];
+      
+          for (const p of provinces) {
+            values.push(p.name);
+            rows.push(`($${values.length})`);
+          }
+      
+          const sql = `
+            INSERT INTO province (name)
+            VALUES ${rows.join(', ')}
+            ON CONFLICT (name) DO NOTHING;
+          `;
+      
+          await db.query(sql, values);
+          
+        } catch (err) {
+          console.error('Error inserting provinces:', err);
+          throw err;
+        }
+      }
+}
+export default new ProvinceM();
