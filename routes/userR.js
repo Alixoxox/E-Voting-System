@@ -1,5 +1,6 @@
 import express from 'express';
 import UserC from '../controllers/userC.js';
+import { authenicator } from '../middleware/authenicator.js';
 const router = express.Router();
 /**
  * @swagger
@@ -72,7 +73,7 @@ const router = express.Router();
  *         description: Server error
  */
 
-router.post("/account/create",UserC.createUser);/**
+router.post("/account/create", UserC.createUser);/**
 * @swagger
 * /api/users/account/signin:
 *   post:
@@ -119,48 +120,35 @@ router.post("/account/create",UserC.createUser);/**
 router.post('/account/signin',UserC.signinUser);
 /**
  * @swagger
- * /api/users/view/Candidates:
- *   post:
- *     summary: Get candidates for a user's election area and current election
- *     tags: [User]
- *     requestBody:
- *       required: true
- *       content:
- *         application/json:
- *           schema:
- *             type: object
- *             required:
- *               - areaId
- *               - electionId
- *             properties:
- *               areaId:
- *                 type: integer
- *                 example: 1
- *               electionId:
- *                 type: integer
- *                 example: 3
- *     responses:
- *       200:
- *         description: List of candidates
- *       500:
- *         description: Failed to fetch candidates
- */
-
-router.post('/view/Candidates',UserC.viewCandidatesForUserElection);
-
-/**
- * @swagger
- * /api/users/voting/history/{userId}:
+ * /api/users/view/Candidates/{electionId}:
  *   get:
- *     summary: Get voting history for a user
+ *     summary: Get candidates for a user's election area and current election
  *     tags: [User]
  *     parameters:
  *       - in: path
- *         name: userId
- *         required: true
+ *         name: electionId
  *         schema:
  *           type: integer
- *         description: ID of the user whose voting history is to be fetched
+ *           example: 3
+ *         required: true
+ *         description: The ID of the election to fetch candidates for
+ *     responses:
+ *       200:
+ *         description: List of candidates returned successfully
+ *       400:
+ *         description: Missing or invalid electionId
+ *       500:
+ *         description: Failed to fetch candidates
+ */
+router.post('/view/Candidates/:electionId',authenicator,UserC.viewCandidatesForUserElection);
+
+/**
+ * @swagger
+ * /api/users/voting/history:
+ *   get:
+ *     summary: Get voting history for a user
+ *     description: Returns all the elections or constituencies where the user has cast a vote.
+ *     tags: [User]
  *     responses:
  *       200:
  *         description: Voting history returned successfully
@@ -176,7 +164,7 @@ router.post('/view/Candidates',UserC.viewCandidatesForUserElection);
  *         description: Failed to fetch voting history
  */
 
-router.get('/voting/history/:userId',UserC.votingHistory);
+router.get('/voting/history/',authenicator,UserC.votingHistory);
 /**
  * @swagger
  * /api/users/cast/vote:
@@ -191,15 +179,11 @@ router.get('/voting/history/:userId',UserC.votingHistory);
  *             type: object
  *             required:
  *               - candidateParticipatingId
- *               - userId
  *               - electionId
  *             properties:
  *               candidateParticipatingId:
  *                 type: integer
  *                 example: 5
- *               userId:
- *                 type: integer
- *                 example: 10
  *               electionId:
  *                 type: integer
  *                 example: 3
@@ -210,9 +194,7 @@ router.get('/voting/history/:userId',UserC.votingHistory);
  *         description: Failed to cast vote
  */
 
-router.post('/cast/vote',UserC.castVote);
-
-
-// candidate leaderboard Result according to the constituency the user belongs to
+router.post('/cast/vote',authenicator,UserC.castVote);
+// candidate leaderboard Result according to the constituency the user belongs to done via websokets
 
 export default router;

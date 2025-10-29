@@ -1,5 +1,10 @@
 import partyM from "../models/partyM.js";
 import bcrypt from "bcrypt"
+import dotenv from "dotenv";
+import jwt from "jsonwebtoken";
+dotenv.config(); // loads variables from .env into process.env
+
+const SECRET_KEY = process.env.SECRET_KEY;
 import parseCsvWithValidation from "../utils/parseCsv.js";
 class Parties {
   getParties = async (req, res) => {
@@ -37,18 +42,23 @@ class Parties {
       const imageUrl = req.file.path; 
       const { name, abbreviation, email, password } = req.body;
       let hashedpass=bcrypt.hash(password,10)
-      await partyM.createParty(name, abbreviation, imageUrl,email,hashedpass);
-      return res.json({ message: "Party created successfully" });
+      let result= await partyM.createParty(name, abbreviation, imageUrl,email,hashedpass);
+
+      const PartyData={id:result.id,name:result.name,email:result.email,role:'party', abbreviation:result.abbreviation,logo:result.logo};
+      const token=jwt.sign(PartyData, SECRET_KEY, {expiresIn:'24h'})
+      return res.json({ message: "Party created successfully" ,PartyData,token});
     } catch (Err) {
       console.log(Err);
-      return res.status(500).json({ error: "Failed to create party" });
+      return res.status(500).json({ error: Err.message||"Failed to create party" });
     }
   }
   async LoginParty(req, res) {
     try {
       const { email, password } = req.body;
-      const partyData = await partyM.LoginParty(email, password);
-      return res.json({ message: "Party logged in successfully", partyData: partyData });
+      const result = await partyM.LoginParty(email, password);
+      const PartyData={id:result.id,name:result.name,email:result.email,role:'party', abbreviation:result.abbreviation,logo:result.logo};
+      const token=jwt.sign(PartyData, SECRET_KEY, {expiresIn:'24h'})
+      return res.json({ message: "Party logged in successfully",PartyData,token });
     } catch (err) {
       console.error(err);
       return res.status(500).json({ error: "Failed to login party" });

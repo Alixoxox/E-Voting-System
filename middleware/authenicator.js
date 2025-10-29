@@ -1,6 +1,9 @@
 import jwt  from "jsonwebtoken";
-import { SECRET_KEY } from "../.env";
+import dotenv from "dotenv";
 
+dotenv.config(); // loads variables from .env into process.env
+
+const SECRET_KEY = process.env.SECRET_KEY;
 const initialV = (req) => {
     const authheader = req.headers.authorization;
     if (!authheader || !authheader.startsWith("Bearer ")) {

@@ -4,7 +4,8 @@ class candidateConstituencyC {
 
 getCandConstByPartyAndElection = async (req, res) => {
   try {
-    const {partyId,electionId} = req.params;
+    const partyId = req.user.id;
+    const {electionId} = req.params;
     console.log(partyId,electionId);
     const candConst = await candConstM.getCandidatesInConstituencyWrtPartyAndElection(partyId,electionId);
     return res.json(candConst);

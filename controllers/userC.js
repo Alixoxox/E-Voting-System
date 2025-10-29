@@ -1,6 +1,12 @@
 import UserM from '../models/userM.js';
 import bcrypt from 'bcrypt';
 import {io} from '../server.js';
+import jwt from 'jsonwebtoken';
+import dotenv from "dotenv";
+
+dotenv.config(); // loads variables from .env into process.env
+
+const SECRET_KEY = process.env.SECRET_KEY;
 class UserC{
 fetchUsers = async (req, res) => {
   try {
@@ -15,18 +21,23 @@ createUser = async (req, res) => {
   try{
     const {name,email, cnic, password, province, city, area} = req.body;
     const hashedPassword = await bcrypt.hash(password, 10);
-    const User=await UserM.createUser(name, email, cnic, hashedPassword, province, city, area, 'user');
-    return res.json({message:'User created successfully',UserData:User});
+    const result=await UserM.createUser(name, email, cnic, hashedPassword, province, city, area, 'user');
+    console.log('User created:', result);
+    const user={id:result.id,name:result.name,email:result.email,cnic:result.cnic,role:result.role,areaId:result.areaid,cityId:result.cityid,provinceId:result.provinceid};
+    const token=jwt.sign(user, SECRET_KEY, {expiresIn:'24h'})
+    return res.json({message:'User created successfully',token,user});
   }catch(Err){
     console.log(Err)
-    return res.status(500).json({error:'Failed to create user'})
+    return res.status(500).json({error:Err.message||'Failed to create user'})
   }
 }
 signinUser = async (req, res) => {
   try{
     const {email, password} = req.body;
-    const UserData=await UserM.signinUser(email, password);
-    return res.json({message:'User signed in successfully',UserData:UserData});
+    const result=await UserM.signinUser(email, password);
+    const UserData={id:result.id,name:result.name,email:result.email,cnic:result.cnic,role:result.role,areaId:result.areaid,cityId:result.cityid,provinceId:result.provinceid};
+    const token=jwt.sign(UserData, SECRET_KEY, {expiresIn:'24h'})
+    return res.json({message:'User signed successfully',token,UserData});
   }catch(err){
     console.error(err);
     return res.status(500).json({error:'Failed to sign in'});
@@ -35,7 +46,8 @@ signinUser = async (req, res) => {
 //search from candidate constituency
 async viewCandidatesForUserElection(req,res){
   try{
-    const {areaId,electionId}=req.body;
+    const areaId=req.user.areaid;
+    const {electionId}=req.params;
     const candidates=await UserM.viewCandidatesForUserElection(areaId,electionId);
     return res.json(candidates);
   }catch(err){
@@ -44,8 +56,8 @@ async viewCandidatesForUserElection(req,res){
   }
 }
 async castVote(req,res) {
-  const { candidateParticipatingId, userId, electionId } = req.body;
-
+  const { candidateParticipatingId, electionId } = req.body;
+  const userId = req.user.id;
   try {
     const result = await UserM.CastVote(candidateParticipatingId, userId, electionId);
 
@@ -70,7 +82,7 @@ async castVote(req,res) {
 
 async votingHistory(req,res){
 try{
-  const {userId}=req.params;
+  const userId=req.user.id;
   console.log(userId);
   const votingHistory=await UserM.votingHistory(userId);
   return res.json(votingHistory);

@@ -4,6 +4,7 @@ import CandidateC from '../controllers/candidateC.js';
 import candidateConstituencyC from '../controllers/candConstC.js';
 
 import multer from 'multer';
+import { authenicator } from '../middleware/authenicator.js';
 const router = express.Router();
 const upload = multer({ dest: 'uploads/' }); // temporary storage
 
@@ -15,17 +16,13 @@ const upload = multer({ dest: 'uploads/' }); // temporary storage
  */
 /**
  * @swagger
- * /api/parties/{partyId}/candidates/fighting/elections/{electionId}:
+ * /api/parties/candidates/fighting/elections/{electionId}:
  *   get:
  *     summary: Get all candidates with their fighting constituencies for a specific party and election
  *     tags: [Parties]
+ *     security:
+ *       - bearerAuth: []
  *     parameters:
- *       - in: path
- *         name: partyId
- *         schema:
- *           type: integer
- *         required: true
- *         description: Party ID to filter candidates
  *       - in: path
  *         name: electionId
  *         schema:
@@ -53,20 +50,15 @@ const upload = multer({ dest: 'uploads/' }); // temporary storage
  *       500:
  *         description: Server error
  */
-router.get('/:partyId/candidates/fighting/elections/:electionId', candidateConstituencyC.getCandConstByPartyAndElection);
+router.get('/candidates/fighting/elections/:electionId', authenicator , candidateConstituencyC.getCandConstByPartyAndElection);
 /**
  * @swagger
- * /api/parties/{partyId}/candidates:
+ * /api/parties/candidates:
  *   get:
  *     summary: Get all registered candidates for a specific party
  *     tags: [Parties]
- *     parameters:
- *       - in: path
- *         name: partyId
- *         schema:
- *           type: integer
- *         required: true
- *         description: ID of the party
+ *     security:
+ *       - bearerAuth: []
  *     responses:
  *       200:
  *         description: List of candidates for the specified party
@@ -88,13 +80,15 @@ router.get('/:partyId/candidates/fighting/elections/:electionId', candidateConst
  *       500:
  *         description: Server error
  */
-router.get('/:partyId/candidates', CandidateC.getCandidatesByPartyId);
+router.get('/candidates', authenicator,CandidateC.getCandidatesByPartyId);
 /**
  * @swagger
  * /api/parties/create/candidate:
  *   post:
  *     summary: Create a new candidate
  *     tags: [Parties]
+ *     security:
+ *       - bearerAuth: []
  *     consumes:
  *       - multipart/form-data
  *     requestBody:
@@ -130,20 +124,16 @@ router.get('/:partyId/candidates', CandidateC.getCandidatesByPartyId);
  *       500:
  *         description: Server error
  */
-router.post('/create/candidate',upload.single('image'), CandidateC.CreateCandidate);
+router.post('/create/candidate',upload.single('image'),authenicator, CandidateC.CreateCandidate);
 /**
  * @swagger
- * /api/parties/{partyId}/kick/candidate/{candidateId}:
+ * /api/parties/kick/candidate/{candidateId}:
  *   delete:
  *     summary: Remove a candidate from a specific party
  *     tags: [Parties]
+ *     security:
+ *       - bearerAuth: []
  *     parameters:
- *       - in: path
- *         name: partyId
- *         schema:
- *           type: integer
- *         required: true
- *         description: ID of the party
  *       - in: path
  *         name: candidateId
  *         schema:
@@ -159,7 +149,7 @@ router.post('/create/candidate',upload.single('image'), CandidateC.CreateCandida
  *         description: Server error
  */
 
-router.delete('/:partyId/kick/candidate/:candidateId', CandidateC.kickCandidate);
+router.delete('/kick/candidate/:candidateId',authenicator ,CandidateC.kickCandidate);
 /**
  * @swagger
  * /api/parties/account/register:
@@ -239,6 +229,8 @@ router.post('/account/signin', Parties.LoginParty);
  *   post:
  *     summary: Allocate Candidate Wrt Constituency Seat for Election
  *     tags: [Parties]
+ *     security:
+ *      - bearerAuth: []
  *     requestBody:
  *       required: true
  *       content:
@@ -264,7 +256,7 @@ router.post('/account/signin', Parties.LoginParty);
  *       500:
  *         description: Server error
  */
-router.post('/candidate/fighting/constituency', candidateConstituencyC.BookConstituencSeatForElectionForCandidate);
+router.post('/candidate/fighting/constituency',authenicator ,candidateConstituencyC.BookConstituencSeatForElectionForCandidate);
 
 
 

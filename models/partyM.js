@@ -57,7 +57,8 @@ class partyM{
 
       async createParty(name, abbreviation, logo,email,password){
         try{
-            await db.query(`INSERT INTO party (name, abbreviation, logo,email,password) VALUES ($1, $2, $3, $4, $5);`, [name, abbreviation, logo,email,password]);
+            let r=await db.query(`INSERT INTO party (name, abbreviation, logo,email,password) VALUES ($1, $2, $3, $4, $5) returning *;`, [name, abbreviation, logo,email,password]);
+            return r.rows[0];
         }catch(err){
           if (err.code === '23505') { // unique violation
             console.error('Email or name already exists');
@@ -75,7 +76,7 @@ class partyM{
             if(!isMatch){
               throw new Error('Invalid password');
             }
-            return user;
+            return result.rows[0];
         }catch(err){
           console.error('Error logging in party:', err);
           throw err;

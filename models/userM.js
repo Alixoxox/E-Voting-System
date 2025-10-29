@@ -47,13 +47,12 @@ class UserM {
     }
     const { province_id, city_id, area_id } = result.rows[0];
 
-    result=await pool.query(`INSERT INTO users (name, email, cnic, password, provinceId, cityId, areaId, role) VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`, [name, email, cnic, password, province_id, city_id, area_id,role ]);
+    result=await pool.query(`INSERT INTO users (name, email, cnic, password, provinceId, cityId, areaId, role) VALUES ($1, $2, $3, $4, $5, $6, $7, $8) Returning *`, [name, email, cnic, password, province_id, city_id, area_id,role ]);
     return result.rows[0];
   }catch(err){
     if (err.code === '23505') {
-      return res.status(400).json({ error: 'Email already exists' });
+      throw new Error('Email or Cnic already exists');
     }
-    console.error('Error creating user:', err);
     throw err;
   }
 }

@@ -12,7 +12,7 @@ class CandiateC{
 }
 getCandidatesByPartyId=async(req, res)=> {
   try {
-    const {partyId}=req.params;
+    const partyId=req.user.id;
     const candidates = await candidateM.getCandidatesByPartyId(partyId);
     return res.json(candidates);
   } catch (err) {
@@ -37,7 +37,8 @@ CreateCandidate=async(req, res)=>{
 }
 kickCandidate=async(req, res)=>{
 try{
-const {candidateId, partyId}=req.params;
+  const partyId=req.user.id;
+const {candidateId}=req.params;
 await candidateM.kickCandidate(candidateId, partyId);
 }catch(err){
   console.error(err);
