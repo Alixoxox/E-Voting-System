@@ -2,7 +2,6 @@ import express from 'express';
 import dotenv from 'dotenv';
 import swaggerUi from 'swagger-ui-express';
 import swaggerJsdoc from 'swagger-jsdoc';
-
 // Routes
 import userRoutes from './routes/userR.js';
 import AdminRoutes from './routes/adminR.js';

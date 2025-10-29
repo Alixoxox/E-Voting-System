@@ -77,7 +77,7 @@ async signinUser(email, password){
 async viewCandidatesForUserElection(areaId, electionId){
   try{
     const sql=`
-    SELECT c.*,cc.id as candidateParticipatingId, u.name, u.email, u.cnic, p.name AS partyName
+    SELECT c.*,cc.id as candidateParticipatingId,cc.totalVotes ,u.name, u.email, u.cnic, p.name AS partyName
     FROM candidateConstituency cc
     JOIN candidate c ON cc.candidateId = c.id
     JOIN users u ON c.userId = u.id
