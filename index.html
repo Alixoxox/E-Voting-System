@@ -1,0 +1,59 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Leaderboard Test</title>
+  <script src="https://cdn.socket.io/4.7.5/socket.io.min.js"></script>
+</head>
+<body style="font-family: Arial; background: #111; color: #eee; padding: 20px;">
+  <h2>🏆 Live Leaderboard Test</h2>
+
+  <label>Area ID: <input id="areaId" type="number" value="1" /></label>
+  <label>Election ID: <input id="electionId" type="number" value="1" /></label>
+  <button id="joinBtn">Join Room</button>
+
+  <h3>Status: <span id="status">Disconnected</span></h3>
+  <ul id="leaderboard"></ul>
+
+  <script>
+    const socket = io("http://localhost:5000", {
+      transports: ["websocket"],
+      reconnection: true,
+    });
+
+    const statusEl = document.getElementById("status");
+    const leaderboardEl = document.getElementById("leaderboard");
+
+    socket.on("connect", () => {
+      statusEl.textContent = "✅ Connected (" + socket.id + ")";
+    });
+
+    socket.on("disconnect", () => {
+      statusEl.textContent = "❌ Disconnected";
+    });
+
+    document.getElementById("joinBtn").addEventListener("click", () => {
+      const areaId = document.getElementById("areaId").value;
+      const electionId = document.getElementById("electionId").value;
+      const room = `const-${areaId}-${electionId}`;
+      socket.emit("joinRoom", room);
+      statusEl.textContent = `🟢 Joined Room: ${room}`;
+    });
+
+    socket.on("leaderboardUpdate", (data) => {
+      console.log("🏆 Leaderboard Update:", data);
+      leaderboardEl.innerHTML = "";
+
+      if (data.leaderboard && data.leaderboard.length > 0) {
+        data.leaderboard.forEach(cand => {
+          const li = document.createElement("li");
+          li.textContent = `${cand.name} (${cand.partyname}) — ${cand.totalvotes} votes`;
+          leaderboardEl.appendChild(li);
+        });
+      } else {
+        leaderboardEl.innerHTML = "<li>No data received</li>";
+      }
+    });
+  </script>
+</body>
+</html>

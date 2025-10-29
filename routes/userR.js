@@ -1,6 +1,5 @@
 import express from 'express';
 import UserC from '../controllers/userC.js';
-
 const router = express.Router();
 /**
  * @swagger
@@ -211,6 +210,9 @@ router.get('/voting/history/:userId',UserC.votingHistory);
  *         description: Failed to cast vote
  */
 
-router.post('/cast/vote',UserC.CastVote);
+router.post('/cast/vote',UserC.castVote);
+
+
+// candidate leaderboard Result according to the constituency the user belongs to
 
 export default router;

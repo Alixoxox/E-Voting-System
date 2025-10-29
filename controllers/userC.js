@@ -1,6 +1,6 @@
 import UserM from '../models/userM.js';
 import bcrypt from 'bcrypt';
-
+import {io} from '../server.js';
 class UserC{
 fetchUsers = async (req, res) => {
   try {
@@ -43,16 +43,30 @@ async viewCandidatesForUserElection(req,res){
     return res.status(500).json({error:'Failed to fetch candidates for current Election'});
   }
 }
-async CastVote(req,res){
-  try{
-    const {candidateParticipatingId,userId,electionId}=req.body;
-    let x=await UserM.CastVote(candidateParticipatingId,userId,electionId);
-    return res.json({message:x.message});
-  }catch(err){
-    console.error(err);
-    return res.status(500).json({error:'Failed to fetch active elections for user'});
-  }
-}
+async castVote(req,res) {
+  const { candidateParticipatingId, userId, electionId } = req.body;
+
+  try {
+    const result = await UserM.CastVote(candidateParticipatingId, userId, electionId);
+
+    // ✅ Respond immediately
+    res.status(200).json(result);
+
+    // 🚀 Run leaderboard update in background (non-blocking)
+    setImmediate(async () => {
+      const leaderboard = await UserM.viewCandidatesForUserElection(result.areaId, result.electionId);
+      const room = `const-${result.areaId}-${result.electionId}`;
+      io.to(room).emit("leaderboardUpdate", {
+        message: "Leaderboard updated",
+        areaId: result.areaId,
+        electionId: result.electionId,
+        leaderboard,
+      });
+    });
+  } catch (err) {
+    console.error("Error Casting Vote:", err);
+    res.status(500).json({ error: "Error casting vote" });
+  }};
 
 async votingHistory(req,res){
 try{

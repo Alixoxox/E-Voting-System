@@ -120,7 +120,15 @@ async CastVote(candidateParticipatingId,userId,electionId){
       WHERE id = $1
     `, [candidateParticipatingId]);
 
-    return { message: 'Vote cast successfully' };
+    const userArea = await pool.query(
+      `SELECT areaId FROM users WHERE id = $1`,
+      [userId]
+    );
+    const areaId = userArea.rows[0].areaid;
+
+    // use areaId + electionId for socket broadcasting
+    return { message: 'Vote cast successfully', areaId, electionId };
+    
   }catch(err){
     console.error('Error casting vote:', err);
     throw err;
