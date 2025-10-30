@@ -3,6 +3,7 @@ import dotenv from 'dotenv';
 import swaggerUi from 'swagger-ui-express';
 import swaggerJsdoc from 'swagger-jsdoc';
 import { swaggerOptions } from './utils/swagerConfig.js';
+import rateLimit from 'express-rate-limit';
 // Routes
 import userRoutes from './routes/userR.js';
 import AdminRoutes from './routes/adminR.js';
@@ -27,6 +28,14 @@ export const io = new Server(server, { cors: { origin: "*" } });
 // Pass `io` to routes if needed
 app.set("io", io);
 
+const limiter = rateLimit({
+  windowMs: 10 * 60 * 1000, // 10 minutes
+  max: 200,                 // 200 requests per IP
+  message: "Too many requests from this IP, please try again later.",
+  standardHeaders: true,
+  legacyHeaders: false,
+});
+app.use(limiter)
 app.use(express.json());
 app.use(express.text({ type: 'text/csv' }));
 
