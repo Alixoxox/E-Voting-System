@@ -24,7 +24,7 @@ class cityM{
             return result.rows;
         }catch(err){
             console.error('Error fetching cities:', err);
-            throw err;
+            throw new Error('Error fetching cities');
         }
     }
     async AddCitycsv(cities) {

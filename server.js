@@ -11,6 +11,7 @@ import publicRoutes from './routes/public.js';
 import userM from './models/userM.js';
 // DB initializer
 import { initTables } from './models/initializer.js';
+import { createClient } from 'redis';
 
 dotenv.config();
 import { Server } from "socket.io";
@@ -18,6 +19,9 @@ import http from "http";
 
 const app = express();
 const server = http.createServer(app);
+export let redisClient = createClient();
+redisClient.on('error', (err) => console.log('Redis Client Error', err));
+await redisClient.connect();
 export const io = new Server(server, { cors: { origin: "*" } });
 
 // Pass `io` to routes if needed
@@ -53,13 +57,19 @@ const swaggerSpec = swaggerJsdoc(swaggerOptions);
   
       try {
         // Fetch current leaderboard even if no votes are cast yet
-        const leaderboard = await userM.viewCandidatesForUserElection(areaId, electionId);
-  
+        let leaderboard;
+        if(await redisClient.exists(`leaderboard:${areaId}:${electionId}`)){
+          let cachedLeaderboard=await redisClient.get(`leaderboard:${areaId}:${electionId}`);
+          leaderboard = JSON.parse(cachedLeaderboard);
+        }else{
+        leaderboard = await userM.viewCandidatesForUserElection(areaId, electionId);
+        redisClient.setEx(`leaderboard:${areaId}:${electionId}`, 10, JSON.stringify(leaderboard));
+        }
         // Emit directly to this user (not broadcast)
         socket.emit("leaderboardUpdate", { leaderboard });
         console.log(`📤 Sent initial leaderboard to ${socket.id}`);
       } catch (err) {
-        console.error("❌ Error fetching leaderboard:", err.message);
+        console.error("Error fetching leaderboard:", err.message);
       }
     });
   

@@ -2,6 +2,7 @@ import partyM from "../models/partyM.js";
 import bcrypt from "bcrypt"
 import dotenv from "dotenv";
 import jwt from "jsonwebtoken";
+import { redisClient } from "../server.js";
 dotenv.config(); // loads variables from .env into process.env
 
 const SECRET_KEY = process.env.SECRET_KEY;
@@ -9,11 +10,16 @@ import parseCsvWithValidation from "../utils/parseCsv.js";
 class Parties {
   getParties = async (req, res) => {
     try {
+      if(await redisClient.exists("AllPartiesInfo")){
+        let cachedParty=await redisClient.get("AllPartiesInfo");
+        return res.json(JSON.parse(cachedParty));
+      }
       const parties = await partyM.getAllParties();
+      await redisClient.setEx("AllPartiesInfo", 3600, JSON.stringify(parties));
       return res.json(parties);
     } catch (err) {
       console.error(err);
-      res.status(500).json({ error: "Failed to fetch parties" });
+      res.status(500).json({ error: err.message||"Failed to fetch parties" });
     }
   };
   AddPartiesCsv = async (req, res) => {
@@ -61,7 +67,7 @@ class Parties {
       return res.json({ message: "Party logged in successfully",PartyData,token });
     } catch (err) {
       console.error(err);
-      return res.status(500).json({ error: "Failed to login party" });
+      return res.status(500).json({ error: err.message||"Failed to login party" });
     }
   }
 }

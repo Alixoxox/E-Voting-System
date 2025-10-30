@@ -28,7 +28,7 @@ class UserM {
       return result.rows;
     } catch (err) {
       console.error("Error fetching users:", err);
-      throw err;
+      throw new Error('Error fetching users');
     }
   }
   async createUser(name, email, cnic, password, province, city, area,role) {
@@ -46,14 +46,13 @@ class UserM {
       throw new Error('Invalid province, city, or area name');
     }
     const { province_id, city_id, area_id } = result.rows[0];
-
     result=await pool.query(`INSERT INTO users (name, email, cnic, password, provinceId, cityId, areaId, role) VALUES ($1, $2, $3, $4, $5, $6, $7, $8) Returning *`, [name, email, cnic, password, province_id, city_id, area_id,role ]);
     return result.rows[0];
   }catch(err){
     if (err.code === '23505') {
       throw new Error('Email or Cnic already exists');
     }
-    throw err;
+    throw new Error(err.message || 'Error creating user');
   }
 }
 async signinUser(email, password){
@@ -70,10 +69,11 @@ async signinUser(email, password){
     return user;
   }catch(err){
     console.error('Error signing in user:', err);
-    throw err;
+    throw new Error(err.message||'Error signing in user');
   }
 }
 async viewCandidatesForUserElection(areaId, electionId){
+  console.log('Viewing from db:', areaId, 'and electionId:', electionId);
   try{
     const sql=`
     SELECT c.*,cc.id as candidateParticipatingId,cc.totalVotes ,u.name, u.email, u.cnic, p.name AS partyName
@@ -90,7 +90,7 @@ async viewCandidatesForUserElection(areaId, electionId){
     return result.rows;
   }catch(err){
     console.error('Error viewing candidates for user election:', err);
-    throw err;
+    throw new Error('Error viewing candidates for user election');
   }
 }
 
@@ -150,7 +150,7 @@ try{
   return result.rows;
 }catch(err){
   console.error('Error fetching voting history:', err);
-  throw err;
+  throw new Error('Error fetching voting history');
 }
 }
 }

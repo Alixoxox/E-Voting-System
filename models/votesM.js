@@ -25,7 +25,7 @@ class votesM {
         return result.rows;
         } catch (err) {
         console.error("Error fetching votes:", err);
-        throw err;
+        throw new Error('Error fetching votes');
         }
     }
 }

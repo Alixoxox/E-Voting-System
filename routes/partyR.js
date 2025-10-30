@@ -221,7 +221,6 @@ router.post('/account/register',upload.single('image'), Parties.createParty);
  *         description: Server error
  */
 router.post('/account/signin', Parties.LoginParty);
-// todo : mass add candidates via csv
 
 /**
  * @swagger
@@ -257,7 +256,55 @@ router.post('/account/signin', Parties.LoginParty);
  *         description: Server error
  */
 router.post('/candidate/fighting/constituency',authenicator ,candidateConstituencyC.BookConstituencSeatForElectionForCandidate);
+/**
+ * @swagger
+ * /api/parties/candidates/{candidateId}/won/seats:
+ *   get:
+ *     summary: Get all won seats for a specific candidate
+ *     tags: [Parties]
+ *     parameters:
+ *       - in: path
+ *         name: candidateId
+ *         required: true
+ *         schema:
+ *           type: integer
+ *         description: ID of the candidate
+ *     responses:
+ *       200:
+ *         description: List of won seats
+ *       500:
+ *         description: Server error
+ */
+router.get('/candidates/:candidateId/won/seats',authenicator ,candidateConstituencyC.GetwonSeats);
+/**
+ * @swagger
+ * /api/parties/candidate/choose/seat:
+ *   post:
+ *     summary: Choose a seat for a candidate in a specific election and constituency
+ *     tags: [Parties]
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               electionId:
+ *                 type: integer
+ *                 example: 3
+ *               constituencyId:
+ *                 type: integer
+ *                 example: 12
+ *               candidateId:
+ *                 type: integer
+ *                 example: 45
+ *     responses:
+ *       200:
+ *         description: Seat chosen successfully
+ *       500:
+ *         description: Failed to choose seat
+ */
 
-
+router.post('/candidate/choose/seat',authenicator ,candidateConstituencyC.ChooseSeat);
 
 export default router;

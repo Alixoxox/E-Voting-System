@@ -3,18 +3,23 @@ import bcrypt from 'bcrypt';
 import {io} from '../server.js';
 import jwt from 'jsonwebtoken';
 import dotenv from "dotenv";
-
+import { redisClient } from '../server.js';
 dotenv.config(); // loads variables from .env into process.env
 
 const SECRET_KEY = process.env.SECRET_KEY;
 class UserC{
 fetchUsers = async (req, res) => {
   try {
+    if(await redisClient.exists("AllUsersInfoAdmin")){
+      let cachedUsers=await redisClient.get("AllUsersInfoAdmin");
+      return res.json(JSON.parse(cachedUsers));
+    }
     const users = await UserM.getAllUsers();
+    await redisClient.setEx("AllUsersInfoAdmin", 900, JSON.stringify(users));
     return res.json(users);
   } catch (err) {
     console.error(err);
-    res.status(500).json({ error: 'Failed to fetch users' });
+    res.status(500).json({ error: err.message||'Failed to fetch users' });
   }
 };
 createUser = async (req, res) => {
@@ -40,7 +45,7 @@ signinUser = async (req, res) => {
     return res.json({message:'User signed successfully',token,UserData});
   }catch(err){
     console.error(err);
-    return res.status(500).json({error:'Failed to sign in'});
+    return res.status(500).json({error:err.message||'Failed to sign in'});
   }
 }
 //search from candidate constituency
@@ -48,48 +53,73 @@ async viewCandidatesForUserElection(req,res){
   try{
     const areaId=req.user.areaid;
     const {electionId}=req.params;
+    if(redisClient.exists(`viewCandidatesForUserElection:${areaId}:${electionId}`)){
+      let cachedCandidates=await redisClient.get(`viewCandidatesForUserElection:${areaId}:${electionId}`);
+      return res.json(JSON.parse(cachedCandidates));
+    }
     const candidates=await UserM.viewCandidatesForUserElection(areaId,electionId);
+    await redisClient.setEx(`viewCandidatesForUserElection:${areaId}:${electionId}`,3600,JSON.stringify(candidates)) 
     return res.json(candidates);
   }catch(err){
     console.error(err);
-    return res.status(500).json({error:'Failed to fetch candidates for current Election'});
+    return res.status(500).json({error:err.message||'Failed to fetch candidates for current Election'});
   }
-}
-async castVote(req,res) {
+}// Cast vote with leaderboard cache update
+async castVote(req, res) {
   const { candidateParticipatingId, electionId } = req.body;
   const userId = req.user.id;
   try {
     const result = await UserM.CastVote(candidateParticipatingId, userId, electionId);
-
-    // ✅ Respond immediately
     res.status(200).json(result);
-
-    // 🚀 Run leaderboard update in background (non-blocking)
     setImmediate(async () => {
-      const leaderboard = await UserM.viewCandidatesForUserElection(result.areaId, result.electionId);
-      const room = `const-${result.areaId}-${result.electionId}`;
-      io.to(room).emit("leaderboardUpdate", {
-        message: "Leaderboard updated",
-        areaId: result.areaId,
-        electionId: result.electionId,
-        leaderboard,
-      });
+      try {
+        const redisKey = `leaderboard:${result.areaId}:${result.electionId}`;
+        let leaderboard;
+        if(await redisClient.exists(redisKey)){
+          leaderboard = await redisClient.get(redisKey);
+          leaderboard = JSON.parse(leaderboard);
+        } else {
+          leaderboard = await UserM.viewCandidatesForUserElection(result.areaId, result.electionId);
+          await redisClient.setEx(redisKey, 10,JSON.stringify(leaderboard)); // 10 sec TTL
+        }
+        // Emit updated leaderboard to clients
+        const room = `const-${result.areaId}-${result.electionId}`;
+        io.to(room).emit("leaderboardUpdate", {
+          message: "Leaderboard updated",
+          areaId: result.areaId,
+          electionId: result.electionId,
+          leaderboard,
+        });
+      } catch (err) {
+        console.error("Error updating leaderboard cache:", err);
+        return res.json({ error: err.message||"Error updating leaderboard cache" });
+      }
     });
   } catch (err) {
     console.error("Error Casting Vote:", err);
-    res.status(500).json({ error: "Error casting vote" });
-  }};
+    res.status(500).json({ error: err.message||"Error casting vote" });
+  }
+}
 
-async votingHistory(req,res){
-try{
-  const userId=req.user.id;
-  console.log(userId);
-  const votingHistory=await UserM.votingHistory(userId);
-  return res.json(votingHistory);
-}catch(err){
-  console.error(err);
-  throw err;
-}}
+// Voting history with cache
+async votingHistory(req, res) {
+  const userId = req.user.id;
+  const redisKey = `votingHistory:${userId}`;
+  try {
+    // 1️⃣ Try cache first
+    let votingHistory ;
+    if (await redisClient.exists(redisKey)) {
+      votingHistory = await redisClient.get(redisKey);
+      return res.json(JSON.parse(votingHistory));
+    }
+    votingHistory = await UserM.votingHistory(userId);
+    await redisClient.setEx(redisKey, 120 ,JSON.stringify(votingHistory)); // 2 min TTL
+    return res.json(votingHistory);
+  } catch (err) {
+    console.error("Error fetching voting history:", err);
+    return res.status(500).json({ error: err.message||"Failed to fetch voting history" });
+  }
+}
 
 }
 export default new UserC()

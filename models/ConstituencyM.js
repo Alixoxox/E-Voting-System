@@ -26,7 +26,7 @@ class ConstituencyM{
             return result.rows;
         }catch(err){
             console.error('Error fetching Constituencies:', err);
-            throw err;
+            throw new Error('Error fetching Constituencies');
         }
     }
     async insertConstituenciesFastest(data) {
@@ -89,11 +89,10 @@ async getAreaByConstituency(constituencyid){
       JOIN area a ON ca.areaid = a.id
       WHERE con.id = $1;`
         const result=await db.query(sql, [constituencyid]);
-        console.log(result.rows);
         return result.rows;
     }catch(err){
         console.error('Error fetching constituency by area ID:', err);
-        throw err;
+        throw new Error('Error fetching constituency by area ID');
     }
 }
 }

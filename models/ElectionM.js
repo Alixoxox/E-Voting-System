@@ -12,6 +12,7 @@ class ElectionM{
             provinceId INTEGER REFERENCES province(id),
             startDate DATE DEFAULT CURRENT_DATE,
             end_date DATE DEFAULT CURRENT_DATE,
+            finalized BOOLEAN DEFAULT FALSE, 
             status VARCHAR(20) CHECK (status IN ('Active','Ended')) DEFAULT 'Active',
             UNIQUE(name, seatType, provinceId));`
             await db.query(sql);
@@ -27,7 +28,7 @@ class ElectionM{
             return result.rows;
         }catch(err){
             console.error('Error fetching elections:', err);
-            throw err;
+            throw new Error('Error fetching elections');
         }
     }
     async createElection(name , startDate, endDate, seatType , Province){
@@ -37,18 +38,18 @@ class ElectionM{
 
     }catch(err){
         console.error('Error creating election:', err);
-        throw err;
+        throw new Error('Error creating election');
     }
     }
     async getActiveElections(curentDate){
         try{
             const result= await db.query(`SELECT e.*, p.name as provinceName FROM elections e 
                 left join province p on e.provinceId = p.id 
-                WHERE end_date >= $1;`, [curentDate]);
+                WHERE end_date >= $1 and status='Active' and startDate<=$1;`, [curentDate]);
             return result.rows;
         }catch(err){
             console.error('Error fetching active elections:', err);
-            throw err;
+            throw new Error('Error fetching active elections');
         }
     }
 }

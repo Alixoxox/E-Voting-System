@@ -1,9 +1,15 @@
 import areaM from "../models/areaM.js";
 import parseCsvWithValidation from "../utils/parseCsv.js";
-
-class AreasC{ getAreas = async (req, res) => {
+import { redisClient } from "../server.js";
+class AreasC{
+  getAreas = async (req, res) => {
   try {
+    if(await redisClient.exists("AllAreasInfo")){
+      let cachedAreas=await redisClient.get("AllAreasInfo");
+      return res.json(JSON.parse(cachedAreas));
+    }
     const areas = await areaM.getAllAreas();
+    await redisClient.setEx("AllAreasInfo", 3600, JSON.stringify(areas));
     return res.json(areas);
   } catch (err) {
     console.error(err);

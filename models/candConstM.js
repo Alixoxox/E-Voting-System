@@ -39,12 +39,8 @@ class candConstM {
       const result = await db.query(sql, [partyId, electionId]);
       return result.rows;
     } catch (err) {
-      console.error(
-        "Error fetching party candidates in constituency for election:",
-        err
-      );
-      throw err;
-    }
+      console.error("Error fetching party candidates in constituency for election:", err);
+      throw new Error("Error fetching party candidates in constituency for election") ;}
   }
   async allocateCandidateEllectionConst(
     candidateId,
@@ -57,41 +53,94 @@ class candConstM {
     } catch (err) {
       if (err.code === "23503") {
         throw new Error("This constituency or election does not exist");
+      } else if (err.code === "23505") {
+        throw new Error(
+          "Candidate is already allocated to this constituency for the election"
+        );
       }
-      console.error(
-        "Error allocating candidate to election and constituency:",
-        err
-      );
-      throw err;
     }
   }
-  async ChooseSeat(candidateId, electionId, constituencyId) {
+  async chooseSeat(candidateId,electionId,constituencyId) {
+
     try {
-      // Get all wins
-      const { rows: wins } = await db.query(
-        `SELECT id, constituencyId FROM candidateConstituency 
-         WHERE candidateId = $1 AND electionId = $2 AND approvalStatus = 'Won'`,
-        [candidateId, electionId]
-      );
+      // 1️⃣ Get all winning seats
+      const { rows: wins } = await db.query(`
+        SELECT id, constituencyid, totalvotes
+        FROM candidateconstituency
+        WHERE candidateid = $1 AND electionid = $2 AND approvalstatus = 'Won'
+      `, [candidateId, electionId]);
   
       if (wins.length <= 1)
-        return res.status(200).json({ message: "Only one or no seat won, nothing to remove" });
+        throw new Error("Only one or no seat won, nothing to remove." );
   
-      // Remove other seats
-      await db.query(
-        `DELETE FROM candidateConstituency 
-         WHERE candidateId = $1 AND electionId = $2 AND constituencyId != $3 AND resultStatus = 'Won'`,
-        [candidateId, electionId, constituencyId]
-      );
+      // 2️⃣ Identify chosen seat
+      const chosenSeat = wins.find(w => w.constituencyid === constituencyId);
+      if (!chosenSeat)
+       throw new Error("Invalid seat selection." );
   
-      res.status(200).json({
-        message: "Seat confirmed — other winning seats removed",
-        keptSeat: constituencyId
-      });
+      // 3️⃣ Delete other won seats
+      const { rows: deletedSeats } = await db.query(`
+        DELETE FROM candidateconstituency
+        WHERE candidateid = $1 AND electionid = $2 
+        AND constituencyid != $3 AND approvalstatus = 'Won'
+        RETURNING constituencyid
+      `, [candidateId, electionId, constituencyId]);
+  
+      // 4️⃣ Promote runner-up for each deleted seat
+      for (const seat of deletedSeats) {
+        const { rows: runnerUp } = await db.query(`
+          SELECT id FROM candidateconstituency
+          WHERE constituencyid = $1 AND electionid = $2
+          ORDER BY totalvotes DESC
+          LIMIT 1
+        `, [seat.constituencyid, electionId]);
+  
+        if (runnerUp.length) {
+          await db.query(`
+            UPDATE candidateconstituency
+            SET approvalstatus = 'Won'
+            WHERE id = $1
+          `, [runnerUp[0].id]);
+        }
+      }
+  
     } catch (err) {
-      console.error(err);
-      res.status(500).json({ message: "Error choosing seat", error: err.message });
-  }
+      console.error("Error choosing seat:", err);
+      throw new Error( err.message ||"Error choosing seat" );
     }
+  }
+    async getWonSeats(candidateId) {
+      try {
+    
+        const { rows } = await db.query(`
+          SELECT 
+            cc.id AS seat_id,
+            cc.constituencyid,
+            c.name AS constituency_name,
+            e.name AS election_name,
+            cc.totalvotes
+          FROM candidateconstituency cc
+          JOIN constituency c ON c.id = cc.constituencyid
+          JOIN elections e ON e.id = cc.electionid
+          WHERE cc.candidateid = $1
+            AND cc.approvalstatus = 'Won'
+            AND e.status = 'Ended' 
+            AND e.finalized = false
+        `, [candidateId]);
+    
+        if (!rows.length)
+          throw new Error ("You have no winning seats." );
+    
+        return{
+          message: "Won seats retrieved successfully",
+          seats: rows
+        };
+    
+      } catch (err) {
+        console.error("Error fetching won seats:", err);
+        throw new Error (err.message||"Error fetching won seats" );
+      }
+    }
+    
 }
 export default new candConstM();

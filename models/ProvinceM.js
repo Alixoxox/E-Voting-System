@@ -19,7 +19,7 @@ class ProvinceM{
             return result.rows;
         }catch(err){
             console.error('Error fetching provinces:', err);
-            throw err;
+            throw new Error('Error fetching provinces');
         }
     }
     async AddProvinceCsv(provinces){

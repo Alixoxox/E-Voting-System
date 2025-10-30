@@ -43,7 +43,7 @@ router.get('/parties', Parties.getParties);
 
 /**
  * @swagger
- * api/public/areas:
+ * /api/public/areas:
  *   get:
  *     summary: Get all areas
  *     tags: [Public]
@@ -176,7 +176,7 @@ router.get('/province', ProvinceC.getProvinces);
 router.get('/constituencies', ConstituencyC.getConstituencies);
 /**
  * @swagger
- * /api/public/constituency/area/{constituencyid}:
+ * /api/public/area/constituency/{constituencyid}:
  *   get:
  *     summary: Get areas by Constituency ID
  *     tags: [Public]
@@ -202,7 +202,7 @@ router.get('/constituencies', ConstituencyC.getConstituencies);
  *         description: Server error while fetching areas
  */
 
-router.get('/constituency/area/:constituencyid', ConstituencyC.getAreaByConstituency);
+router.get('/area/constituency/:constituencyid', ConstituencyC.getAreaByConstituency);
 
 /**
  * @swagger

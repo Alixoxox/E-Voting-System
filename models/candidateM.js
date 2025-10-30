@@ -28,7 +28,7 @@ class candidateM{
             return result.rows;
         }catch(err){
             console.error('Error fetching candidates:', err);
-            throw err;
+            throw new Error('Error fetching candidates');
         }
     }
     async createCandidate(name,email, cnic, password, province, city, area, partyId, manifesto,imageUrl){
@@ -41,7 +41,7 @@ class candidateM{
             
         }catch(err){
             console.error('Error creating candidate:', err);
-            throw err;
+            throw new Error('Error creating candidate');
         }
     }
     async getCandidatesByPartyId(partyId){
@@ -54,7 +54,7 @@ class candidateM{
             return result.rows;
         }catch(err){
             console.error('Error fetching candidates by party ID:', err);
-            throw err;
+            throw new Error('Error fetching candidates by party ID');
         }
     }
     async kickCandidate(candidateId, partyId){
@@ -62,7 +62,7 @@ class candidateM{
             await db.query(`DELETE FROM candidate WHERE id = $1 AND partyId = $2`, [candidateId, partyId]);
         }catch(err){
             console.error('Error kicking candidate:', err);
-            throw err;
+            throw new Error('Error kicking candidate');
         }
     }
 }

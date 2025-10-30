@@ -23,7 +23,7 @@ class areaM {
       return result.rows;
     } catch (err) {
       console.error("Error fetching areas:", err);
-      throw err;
+      throw new Error("Error fetching areas");
     }
   }
 
@@ -53,12 +53,11 @@ class areaM {
       }
       // pg-format builds placeholders automatically
       const sql = format(
-        `
-              INSERT INTO area (name, cityid)
-              VALUES %L
-              ON CONFLICT (name, cityid) DO NOTHING
-              Returning id;
-            `,
+        `INSERT INTO area (name, cityid)
+        VALUES %L
+        ON CONFLICT (name, cityid) DO NOTHING
+        Returning id;
+        `,
         values
       );
 

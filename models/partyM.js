@@ -27,7 +27,7 @@ class partyM{
             return result.rows;
         }catch(err){
             console.error('Error fetching parties:', err);
-            throw err;
+            throw new Error('Error fetching parties');
         }
     }
     async addParties(parties){
@@ -79,7 +79,7 @@ class partyM{
             return result.rows[0];
         }catch(err){
           console.error('Error logging in party:', err);
-          throw err;
+          throw new Error(err.message || 'Error logging in party');
         }
 }
 }

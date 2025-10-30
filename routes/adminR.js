@@ -36,7 +36,7 @@ const upload = multer({ dest: 'uploads/' }); // temporary storage
  *       500:
  *         description: Server error
  */
-router.get('/', userC.fetchUsers);
+router.get('/fetch/users', userC.fetchUsers);
 
 /**
  * @swagger
