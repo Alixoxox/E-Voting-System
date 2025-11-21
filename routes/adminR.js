@@ -7,6 +7,7 @@ import ProvinceC from '../controllers/ProvinceC.js';
 import ConstituencyC from '../controllers/ConstituencyC.js';
 import Parties from '../controllers/partyC.js';
 import userC from '../controllers/userC.js';
+import { authenicator } from '../middleware/authenicator.js';
 
 const router = express.Router();
 const upload = multer({ dest: 'uploads/' }); // temporary storage
@@ -36,7 +37,7 @@ const upload = multer({ dest: 'uploads/' }); // temporary storage
  *       500:
  *         description: Server error
  */
-router.get('/fetch/users', userC.fetchUsers);
+router.get('/fetch/users',authenicator, userC.fetchUsers);
 
 /**
  * @swagger
@@ -72,7 +73,7 @@ router.get('/fetch/users', userC.fetchUsers);
  *       500:
  *         description: Server error
  */
-router.post('/area/upload-csv', upload.single('file'), AreasC.AddAreasCsv);
+router.post('/area/upload-csv',authenicator, upload.single('file'), AreasC.AddAreasCsv);
 
 
 /**
@@ -109,7 +110,7 @@ router.post('/area/upload-csv', upload.single('file'), AreasC.AddAreasCsv);
  *       500:
  *         description: Server error
  */
-router.post('/cities/upload-csv', upload.single('file'), cityC.AddCitycsv);
+router.post('/cities/upload-csv',authenicator, upload.single('file'), cityC.AddCitycsv);
 
 /**
 * @swagger
@@ -189,7 +190,7 @@ router.post('/cities/upload-csv', upload.single('file'), cityC.AddCitycsv);
 *                   example: "Failed to add election session"
 */
 
-router.post("/elections/addSession",ElectionC.CreateEllection);
+router.post("/elections/addSession",authenicator,ElectionC.CreateEllection);
 
 /**
  * @swagger
@@ -223,7 +224,7 @@ router.post("/elections/addSession",ElectionC.CreateEllection);
  *       500:
  *         description: Server error
  */
-router.post('/province/upload-csv', upload.single('file'), ProvinceC.AddProvincesCsv);
+router.post('/province/upload-csv',authenicator, upload.single('file'), ProvinceC.AddProvincesCsv);
 
 /**
  * @swagger
@@ -259,7 +260,7 @@ router.post('/province/upload-csv', upload.single('file'), ProvinceC.AddProvince
  *       500:
  *         description: Server error
  */
-router.post('/constituencies/upload-csv',upload.single('file'), ConstituencyC.addConstituency);
+router.post('/constituencies/upload-csv',authenicator,upload.single('file'), ConstituencyC.addConstituency);
 /**
  * @swagger
  * /api/admin/party/upload-csv:
@@ -294,7 +295,7 @@ router.post('/constituencies/upload-csv',upload.single('file'), ConstituencyC.ad
  *       500:
  *         description: Server error
  */
-router.post('/party/upload-csv', upload.single('file'), Parties.AddPartiesCsv);
+router.post('/party/upload-csv',authenicator, upload.single('file'), Parties.AddPartiesCsv);
 /**
  * @swagger
  * /api/admin/auth/signin:
@@ -340,5 +341,79 @@ router.post('/party/upload-csv', upload.single('file'), Parties.AddPartiesCsv);
  *         description: Server error
  */
 router.post('/auth/signin', userC.adminSignin);
+
+/**
+ * @swagger
+ * /api/admin/EditProfile:
+ *   post:
+ *     summary: Edit Admin profile
+ *     tags: [Admin]
+ *     security:
+ *       - bearerAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               name:
+ *                 type: string
+ *                 example: "John Doe"
+ *               email:
+ *                 type: string
+ *                 format: email
+ *                 example: "john@example.com"
+ *               password:
+ *                 type: string
+ *                 format: password
+ *                 example: "newPassword123"
+ *             description: At least one field must be provided
+ *     responses:
+ *       200:
+ *         description: Profile updated successfully
+ *       400:
+ *         description: No fields provided for update
+ *       500:
+ *         description: Server error
+ */
+router.post('/EditProfile', authenicator, userC.EditProfile);
+
+/**
+ * @swagger
+ * /api/admin/ForgotPassword:
+ *   post:
+ *     summary: Reset admin password
+ *     tags: [Admin]
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [email, cnic, oldPassword, newPassword]
+ *             properties:
+ *               email:
+ *                 type: string
+ *                 format: email
+ *                 example: "user@example.com"
+ *               cnic:
+ *                 type: string
+ *                 example: "00000-0000000-0"
+ *               oldPassword:
+ *                 type: string
+ *                 format: password
+ *                 example: "oldPass123"
+ *               newPassword:
+ *                 type: string
+ *                 format: password
+ *                 example: "newPass123"
+ *     responses:
+ *       200:
+ *         description: Password reset successfully
+ *       500:
+ *         description: Server error
+ */
+router.post('/ForgotPassword', userC.forgotPassword);
 
 export default router;

@@ -1,6 +1,7 @@
 import express from 'express';
 import UserC from '../controllers/userC.js';
 import { authenicator } from '../middleware/authenicator.js';
+import userC from '../controllers/userC.js';
 const router = express.Router();
 /**
  * @swagger
@@ -196,5 +197,80 @@ router.get('/voting/history/',authenicator,UserC.votingHistory);
 
 router.post('/cast/vote',authenicator,UserC.castVote);
 // candidate leaderboard Result according to the constituency the user belongs to done via websokets
+
+
+/**
+ * @swagger
+ * /api/user/EditProfile:
+ *   post:
+ *     summary: Edit user profile
+ *     tags: [User]
+ *     security:
+ *       - bearerAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               name:
+ *                 type: string
+ *                 example: "John Doe"
+ *               email:
+ *                 type: string
+ *                 format: email
+ *                 example: "john@example.com"
+ *               password:
+ *                 type: string
+ *                 format: password
+ *                 example: "newPassword123"
+ *             description: At least one field must be provided
+ *     responses:
+ *       200:
+ *         description: Profile updated successfully
+ *       400:
+ *         description: No fields provided for update
+ *       500:
+ *         description: Server error
+ */
+router.post('/EditProfile', authenicator, userC.EditProfile);
+
+/**
+ * @swagger
+ * /api/user/ForgotPassword:
+ *   post:
+ *     summary: Reset user password
+ *     tags: [User]
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [email, cnic, oldPassword, newPassword]
+ *             properties:
+ *               email:
+ *                 type: string
+ *                 format: email
+ *                 example: "user@example.com"
+ *               cnic:
+ *                 type: string
+ *                 example: "00000-0000000-0"
+ *               oldPassword:
+ *                 type: string
+ *                 format: password
+ *                 example: "oldPass123"
+ *               newPassword:
+ *                 type: string
+ *                 format: password
+ *                 example: "newPass123"
+ *     responses:
+ *       200:
+ *         description: Password reset successfully
+ *       500:
+ *         description: Server error
+ */
+router.post('/ForgotPassword', userC.forgotPassword);
 
 export default router;

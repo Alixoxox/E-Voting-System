@@ -25,12 +25,15 @@ export const authenicator = (req, res, next) => {
         jwt.verify(token, SECRET_KEY, (err, user) => {
             if (err) {
                 console.log("JWT Verification Error:", err);
+                if (err.name === 'TokenExpiredError') {
+                    return res.status(401).json({ message: "Session Expired. Please log in again." });
+                }
                 return res.json({ message: "Invalid or expired token" });
             }
             req.user = user;
             next();
         });
     } catch (err) {
-        return res.json({ message: err.message || "Unauthorized" });
+        return res.status(400).json({ message: err.message || "Unauthorized" });
     }
 };

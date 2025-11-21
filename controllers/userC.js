@@ -4,6 +4,8 @@ import {io} from '../server.js';
 import jwt from 'jsonwebtoken';
 import dotenv from "dotenv";
 import { redisClient } from '../server.js';
+import votesM from '../models/votesM.js';
+import userM from '../models/userM.js';
 dotenv.config(); // loads variables from .env into process.env
 
 const SECRET_KEY = process.env.SECRET_KEY;
@@ -69,7 +71,7 @@ async castVote(req, res) {
   const { candidateParticipatingId, electionId } = req.body;
   const userId = req.user.id;
   try {
-    const result = await UserM.CastVote(candidateParticipatingId, userId, electionId);
+    const result = await votesM.CastVote(candidateParticipatingId, userId, electionId);
     res.status(200).json(result);
     setImmediate(async () => {
       try {
@@ -112,7 +114,7 @@ async votingHistory(req, res) {
       votingHistory = await redisClient.get(redisKey);
       return res.json(JSON.parse(votingHistory));
     }
-    votingHistory = await UserM.votingHistory(userId);
+    votingHistory = await votesM.votingHistory(userId);
     await redisClient.setEx(redisKey, 120 ,JSON.stringify(votingHistory)); // 2 min TTL
     return res.json(votingHistory);
   } catch (err) {
@@ -121,7 +123,7 @@ async votingHistory(req, res) {
   }
 }
 async adminSignin(req, res) {
-const {email,password,cnic}=req.body;
+const {email,password}=req.body;
 try{
   const result=await UserM.signinUser(email, password,'admin');
   const AdminData={id:result.id,name:result.name,email:result.email,cnic:result.cnic,role:result.role,areaId:result.areaid,cityId:result.cityid,provinceId:result.provinceid};
@@ -131,5 +133,27 @@ try{
   console.error(err);
   return res.status(500).json({error:err.message||'Failed to sign in as admin'});
 }}
+async EditProfile(req, res){
+const userId=req.user.id;
+const {name,email,password}=req.body;
+try{
+  // Basic validation: Ensure at least one field is there
+  if (!name && !email && !password) {
+    return res.status(400).json({ error: "Please provide name, email, or password to update." });
+  }
+  await userM.EditProfile(userId,name,email,password);
+}catch(err){
+  console.error(err);
+  return res.status(500).json({error:err.message||'Failed to edit profile'});}
+}
+async forgotPassword(req, res){
+  try{
+  const {email,cnic,oldPassword,newPassword}=req.body; 
+  await UserM.resetPassword(email,cnic,oldPassword, newPassword)
+  return res.json({message:'Password reset successfully\nHead Over to Login Page'});
+  }catch(err){
+  console.error(err);
+  return res.status(500).json({error:err.message||'Failed to reset password'});}
+}
 }
 export default new UserC()
