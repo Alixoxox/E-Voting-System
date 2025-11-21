@@ -198,7 +198,6 @@ router.get('/voting/history/',authenicator,UserC.votingHistory);
 router.post('/cast/vote',authenicator,UserC.castVote);
 // candidate leaderboard Result according to the constituency the user belongs to done via websokets
 
-
 /**
  * @swagger
  * /api/user/EditProfile:

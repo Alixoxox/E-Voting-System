@@ -1,6 +1,7 @@
 import areaM from "../models/areaM.js";
 import parseCsvWithValidation from "../utils/parseCsv.js";
 import { redisClient } from "../server.js";
+import auditLogsM from "../models/auditLogsM.js";
 class AreasC{
   getAreas = async (req, res) => {
   try {
@@ -13,6 +14,7 @@ class AreasC{
     return res.json(areas);
   } catch (err) {
     console.error(err);
+    await auditLogsM.logAction(req,'FETCH_AREAS_FAILED','FETCH_AREAS_FAILED',{error:err.message,status: 'Error'});
     res.status(500).json({ error: 'Failed to fetch areas' });
   }
 }
@@ -23,9 +25,11 @@ class AreasC{
     const data = await parseCsvWithValidation(req.file.path, required);
     // now insert to db
     areaM.AddAreasCsv(data)
+    await auditLogsM.logAction(req,'AREAS_CSV_UPLOAD','AREAS_CSV_UPLOAD',{rowsAdded:data.length,status: 'Success'});
     return res.json({ message: 'Areas added successfully' });    
   }catch(err){
     console.error(err);
+    await auditLogsM.logAction(req,'AREAS_CSV_UPLOAD_FAILED','AREAS_CSV_UPLOAD_FAILED',{error:err.message,status: 'Error'});
     res.status(500).json({ error: 'Failed to add areas from CSV\n'+err });
   }
 }}

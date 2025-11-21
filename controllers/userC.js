@@ -6,6 +6,7 @@ import dotenv from "dotenv";
 import { redisClient } from '../server.js';
 import votesM from '../models/votesM.js';
 import userM from '../models/userM.js';
+import auditLogsM from '../models/auditLogsM.js';
 dotenv.config(); // loads variables from .env into process.env
 
 const SECRET_KEY = process.env.SECRET_KEY;
@@ -21,6 +22,7 @@ fetchUsers = async (req, res) => {
     return res.json(users);
   } catch (err) {
     console.error(err);
+    await auditLogsM.logAction(req,'FETCH_USERS_FAILED','ADMIN_'+req.user.id,{ error:err.message||'Failed to fetch users' ,status: 'Error'});
     res.status(500).json({ error: err.message||'Failed to fetch users' });
   }
 };
@@ -35,6 +37,7 @@ createUser = async (req, res) => {
     return res.json({message:'User created successfully',token,user});
   }catch(Err){
     console.log(Err)
+    await auditLogsM.logAction(req,'FAILED_CREATE_USER','SYSTEM',{error:Err.message||'Failed to create user' ,email:req.body.email,status: 'Error'});
     return res.status(500).json({error:Err.message||'Failed to create user'})
   }
 }
@@ -47,6 +50,7 @@ signinUser = async (req, res) => {
     return res.json({message:'User signed successfully',token,UserData});
   }catch(err){
     console.error(err);
+    await auditLogsM.logAction(req,'FAILED_USER_SIGNIN','SYSTEM',{ error:err.message||'Failed to sign in' ,email:req.body.email,status: 'Error'});
     return res.status(500).json({error:err.message||'Failed to sign in'});
   }
 }
@@ -64,6 +68,7 @@ async viewCandidatesForUserElection(req,res){
     return res.json(candidates);
   }catch(err){
     console.error(err);
+    await auditLogsM.logAction(req,'FAILED_FETCH_CANDIDATES_FOR_USER_ELECTION','User_'+req.user.id,{ error:err.message||'Failed to fetch candidates for current Election' ,email:req.user.email,status: 'Error'});
     return res.status(500).json({error:err.message||'Failed to fetch candidates for current Election'});
   }
 }// Cast vote with leaderboard cache update
@@ -99,6 +104,7 @@ async castVote(req, res) {
     });
   } catch (err) {
     console.error("Error Casting Vote:", err);
+    await auditLogsM.logAction(req,'FAILED_CAST_VOTE','User_'+userId,{ error:err.message||'Failed to cast vote' ,email:req.user.email,status: 'Error'});
     res.status(500).json({ error: err.message||"Error casting vote" });
   }
 }
@@ -119,6 +125,7 @@ async votingHistory(req, res) {
     return res.json(votingHistory);
   } catch (err) {
     console.error("Error fetching voting history:", err);
+    await auditLogsM.logAction(req,'FAILED_FETCH_VOTING_HISTORY','User_'+userId,{ error:err.message||'Failed to fetch voting history' ,email:req.user.email,status: 'Error'});
     return res.status(500).json({ error: err.message||"Failed to fetch voting history" });
   }
 }
@@ -131,6 +138,7 @@ try{
   return res.json({message:'Admin signed successfully',token,AdminData});
 }catch(err){
   console.error(err);
+  await auditLogsM.logAction(req,'FAILED_ADMIN_SIGNIN','SYSTEM',{ error:err.message||'Failed to sign in as admin' ,email:req.body.email,status: 'Error'});
   return res.status(500).json({error:err.message||'Failed to sign in as admin'});
 }}
 async EditProfile(req, res){
@@ -144,6 +152,7 @@ try{
   await userM.EditProfile(userId,name,email,password);
 }catch(err){
   console.error(err);
+  await auditLogsM.logAction(req,'FAILED_PROFILE_EDIT','User_'+userId,{ error:err.message||'Failed to edit profile' ,email:req.user.email,status: 'Error'});
   return res.status(500).json({error:err.message||'Failed to edit profile'});}
 }
 async forgotPassword(req, res){
@@ -153,6 +162,7 @@ async forgotPassword(req, res){
   return res.json({message:'Password reset successfully\nHead Over to Login Page'});
   }catch(err){
   console.error(err);
+  await auditLogsM.logAction(req,'FAILED_PASSWORD_RESET','User_',{ error:err.message ,status: 'Error'});
   return res.status(500).json({error:err.message||'Failed to reset password'});}
 }
 }

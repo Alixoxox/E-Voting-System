@@ -1,6 +1,7 @@
 import cityM from "../models/cityM.js";
 import parseCsvWithValidation from "../utils/parseCsv.js";
 import { redisClient } from "../server.js";
+import auditLogsM from "../models/auditLogsM.js";
 class cityC{
   getCities = async (req, res) => {
   try {
@@ -13,6 +14,7 @@ class cityC{
     return res.json(cities);
   } catch (err) {
     console.error(err);
+    await auditLogsM.logAction(req,'FETCH_CITIES_FAILED','FETCH_CITIES_FAILED',{error:err.message,status: 'Error'});
     res.status(500).json({ error: err.message||'Failed to fetch cities' });
   }
 }
@@ -23,10 +25,12 @@ AddCitycsv = async (req, res) => {
     // now insert to db
     console.log("all good here")
     await cityM.AddCitycsv(data)
+    await auditLogsM.logAction(req,'CITY_CSV_UPLOAD','CITY_CSV_UPLOAD',{rowsAdded:data.length,status: 'Success'});
     return res.json({ message: 'Cities added successfully' });
     
   }catch(err){
     console.error(err);
+    await auditLogsM.logAction(req,'CITY_CSV_UPLOAD_FAILED','CITY_CSV_UPLOAD_FAILED',{error:err.message,status: 'Error'});
     res.status(500).json({ error: 'Failed to add cities from CSV\n'+err });
   }
 }

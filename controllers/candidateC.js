@@ -1,6 +1,7 @@
 import candidateM from '../models/candidateM.js';
 import bcrypt from 'bcrypt';
 import { redisClient } from '../server.js';
+import auditLogsM from '../models/auditLogsM.js';
 class CandiateC{
  getCandidates=async(req, res)=> {
   try {
@@ -13,6 +14,7 @@ class CandiateC{
     return res.json(candidates);
   } catch (err) {
     console.error(err);
+    await auditLogsM.logAction(req,'FAILED_FETCH_CANDIDATES' ,'SYSTEM',{ error:err.message||'Failed to fetch candidates' ,email:req.user.email,status: 'Error'});
     res.status(500).json({ error:err.message|| 'Failed to fetch candidates' });
   }
 }
@@ -28,6 +30,7 @@ getCandidatesByPartyId=async(req, res)=> {
     return res.json(candidates);
   } catch (err) {
     console.error(err);
+    await auditLogsM.logAction(req,'FAILED_FETCH_CANDIDATES_BY_PARTY_ID' ,'Party_'+req.user.id,{ error:err.message||'Failed to fetch candidates by party ID' ,email:req.user.email,status: 'Error'});
     res.status(500).json({ error: err.message||'Failed to fetch candidates by party ID' });
   }
 }
@@ -38,10 +41,12 @@ CreateCandidate=async(req, res)=>{
     const {name,email, cnic, password, province, city, area}=UserData
     const {partyId, manifesto}=Candidate
     let hashedPassword = await bcrypt.hash(password, 10);
-    await candidateM.createCandidate(name,email, cnic, hashedPassword, province, city, area, partyId, manifesto,imageUrl);
-    return  res.json({message:'Candidate created successfully'});
+    const result=await candidateM.createCandidate(name,email, cnic, hashedPassword, province, city, area, partyId, manifesto,imageUrl);
+    await auditLogsM.logAction(req,'ADD_CANDIDATE' ,'Candidate_'+result.candId,{ email: email, msg: "Candidate creation successful" ,status: 'Success'});
+    return res.json({message:'Candidate created successfully'});
   }catch(err){
     console.error(err);
+    await auditLogsM.logAction(req,'FAILED_ADD_CANDIDATE' ,'Candidate_CREATION_FAILED',{ error:err.message||'Failed to create candidate' ,email:req.user.email,status: 'Error'});
     res.status(500).json({ error:err.message|| 'Failed to create candidate' });
   }
 
@@ -51,8 +56,10 @@ try{
   const partyId=req.user.id;
 const {candidateId}=req.params;
 await candidateM.kickCandidate(candidateId, partyId);
+await auditLogsM.logAction(req,'KICK_CANDIDATE' ,'Candidate_'+candidateId,{ msg: "Candidate kicked successfully" ,status: 'Success'});
 }catch(err){
   console.error(err);
+  await auditLogsM.logAction(req,'FAILED_KICK_CANDIDATE' ,'Candidate_'+req.params.candidateId,{error:err.message||'Failed to kick candidate' ,email:req.user.email,status: 'Error'});
   res.status(500).json({ error:err.message|| 'Failed to kick candidate' });
 }
 }

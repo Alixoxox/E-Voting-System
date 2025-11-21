@@ -171,7 +171,6 @@ async resetPassword(email,cnic,oldPassword, newPassword){
     const hashedPassword = await bcrypt.hash(newPassword, 10);
     await pool.query(`UPDATE users SET password = $1 WHERE email = $2 and cnic = $3 and id= $4`, [hashedPassword, email, cnic,findIfPresent.rows[0].id]);
   }catch(err){
-    console.error('Error resetting password:', err);
     throw new Error(err.message || 'Error resetting password');
   }
 }

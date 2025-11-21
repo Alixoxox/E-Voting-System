@@ -1,5 +1,6 @@
 import cron from "node-cron";
 import db from "../config/db.js";
+import auditLogsM from "../models/auditLogsM.js";
 
 cron.schedule("0 2 * * *", async () => {
   console.log("🕐 Running auto seat chooser...");
@@ -68,10 +69,11 @@ cron.schedule("0 2 * * *", async () => {
       await db.query(`
         UPDATE elections SET finalized = TRUE WHERE id = $1
       `, [electionId]);
-
+        await auditLogsM.logAction('AUTO_SEAT_ASSIGNMENT_COMPLETED', { electionId ,status:'Success'});
       console.log(`Auto seat assignment completed for election ${electionId}`);
     }
   } catch (err) {
+    await auditLogsM.logAction('AUTO_SEAT_ASSIGNMENT_FAILED', { error: err.message ,status:'Error'});
     console.error("Error in auto seat chooser:", err);
   }
 });

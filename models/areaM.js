@@ -1,6 +1,5 @@
 import db from "../config/db.js";
 import format from 'pg-format';
-import ConstituencyM from "./ConstituencyM.js";
 class areaM {
   async createTable() {
     try {

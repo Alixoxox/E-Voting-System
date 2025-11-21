@@ -37,8 +37,8 @@ class candidateM{
             if(result.rows.length === 0){
                 await userM.createUser(name, email, cnic, password, province, city, area, 'candidate');
             }
-            await db.query(`INSERT INTO candidate (userId, partyId, manifesto,imageUrl) VALUES ($1, $2, $3, $4)`, [result.rows[0].id, partyId, manifesto,imageUrl]);
-            
+            let candId=await db.query(`INSERT INTO candidate (userId, partyId, manifesto,imageUrl) VALUES ($1, $2, $3, $4) Returning id`, [result.rows[0].id, partyId, manifesto,imageUrl]);
+            return candId.rows[0].id;
         }catch(err){
             console.error('Error creating candidate:', err);
             throw new Error('Error creating candidate');
