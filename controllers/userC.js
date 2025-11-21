@@ -39,7 +39,7 @@ createUser = async (req, res) => {
 signinUser = async (req, res) => {
   try{
     const {email, password} = req.body;
-    const result=await UserM.signinUser(email, password);
+    const result=await UserM.signinUser(email, password, 'user');
     const UserData={id:result.id,name:result.name,email:result.email,cnic:result.cnic,role:result.role,areaId:result.areaid,cityId:result.cityid,provinceId:result.provinceid};
     const token=jwt.sign(UserData, SECRET_KEY, {expiresIn:'24h'})
     return res.json({message:'User signed successfully',token,UserData});
@@ -120,6 +120,16 @@ async votingHistory(req, res) {
     return res.status(500).json({ error: err.message||"Failed to fetch voting history" });
   }
 }
-
+async adminSignin(req, res) {
+const {email,password,cnic}=req.body;
+try{
+  const result=await UserM.signinUser(email, password,'admin');
+  const AdminData={id:result.id,name:result.name,email:result.email,cnic:result.cnic,role:result.role,areaId:result.areaid,cityId:result.cityid,provinceId:result.provinceid};
+  const token=jwt.sign(AdminData, SECRET_KEY, {expiresIn:'24h'})
+  return res.json({message:'Admin signed successfully',token,AdminData});
+}catch(err){
+  console.error(err);
+  return res.status(500).json({error:err.message||'Failed to sign in as admin'});
+}}
 }
 export default new UserC()

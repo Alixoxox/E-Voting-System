@@ -33,7 +33,6 @@ class UserM {
   }
   async createUser(name, email, cnic, password, province, city, area,role) {
   try{
-    console.log('Creating user with:', name, email, cnic, province, city, area, role);
     let result = await pool.query(`
       SELECT p.id AS province_id, c.id AS city_id, a.id AS area_id
       FROM province p
@@ -41,7 +40,6 @@ class UserM {
       JOIN area a ON a.cityid = c.id
       WHERE p.name = $1 AND c.name = $2 AND a.name = $3
     `, [province, city, area]); 
-    console.log('Location IDs fetched:', result.rows);
     if(result.rows.length === 0){
       throw new Error('Invalid province, city, or area name');
     }
@@ -55,9 +53,9 @@ class UserM {
     throw new Error(err.message || 'Error creating user');
   }
 }
-async signinUser(email, password){
+async signinUser(email, password,role){
   try{
-    const result = await pool.query(`SELECT * FROM users WHERE email = $1`, [email]);
+    const result = await pool.query(`SELECT * FROM users WHERE email = $1 and role = $2`, [email,role]);
     if(result.rows.length === 0){
       throw new Error('User not found');
     }
@@ -152,6 +150,17 @@ try{
   console.error('Error fetching voting history:', err);
   throw new Error('Error fetching voting history');
 }
+}
+
+async PutAdmin(admins){
+    for(const admin of admins){
+      try{
+      const hashedPassword = await bcrypt.hash(admin.password, 10);
+      await this.createUser(admin.name, admin.email, admin.cnic, hashedPassword, admin.province, admin.city, admin.area,'admin');
+      console.log(`Admin user ${admin.email} created.`);
+  }catch(err){
+    console.log(`Admin ${admin.name} Already Present`);
+  } }
 }
 }
 export default new UserM();

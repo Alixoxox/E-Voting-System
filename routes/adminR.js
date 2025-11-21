@@ -295,5 +295,50 @@ router.post('/constituencies/upload-csv',upload.single('file'), ConstituencyC.ad
  *         description: Server error
  */
 router.post('/party/upload-csv', upload.single('file'), Parties.AddPartiesCsv);
+/**
+ * @swagger
+ * /api/admin/auth/signin:
+ *   post:
+ *     summary: Admin Login
+ *     tags: [Admin]
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [email, password, cnic]
+ *             properties:
+ *               email:
+ *                 type: string
+ *                 format: email
+ *                 example: "admin@vote.com"
+ *               password:
+ *                 type: string
+ *                 format: password
+ *                 example: "admin123"
+ *               cnic:
+ *                 type: string
+ *                 example: "00000-0000000-0"
+ *     responses:
+ *       200:
+ *         description: Login successful
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 message:
+ *                   type: string
+ *                 token:
+ *                   type: string
+ *                 UserData:
+ *                   type: object
+ *       401:
+ *         description: Invalid credentials or CNIC
+ *       500:
+ *         description: Server error
+ */
+router.post('/auth/signin', userC.adminSignin);
 
 export default router;
