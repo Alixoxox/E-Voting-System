@@ -44,7 +44,7 @@ createUser = async (req, res) => {
 signinUser = async (req, res) => {
   try{
     const {email, password} = req.body;
-    const result=await UserM.signinUser(email, password, 'user');
+    const result=await UserM.signinUser(email, password);
     const UserData={id:result.id,name:result.name,email:result.email,cnic:result.cnic,role:result.role,areaId:result.areaid,cityId:result.cityid,provinceId:result.provinceid};
     const token=jwt.sign(UserData, SECRET_KEY, {expiresIn:'24h'})
     return res.json({message:'User signed successfully',token,UserData});
@@ -132,7 +132,7 @@ async votingHistory(req, res) {
 async adminSignin(req, res) {
 const {email,password}=req.body;
 try{
-  const result=await UserM.signinUser(email, password,'admin');
+  const result=await UserM.signinUser(email, password);
   const AdminData={id:result.id,name:result.name,email:result.email,cnic:result.cnic,role:result.role,areaId:result.areaid,cityId:result.cityid,provinceId:result.provinceid};
   const token=jwt.sign(AdminData, SECRET_KEY, {expiresIn:'24h'})
   return res.json({message:'Admin signed successfully',token,AdminData});

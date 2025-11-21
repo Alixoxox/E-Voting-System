@@ -55,9 +55,9 @@ class UserM {
     throw new Error(err.message || 'Error creating user');
   }
 }
-async signinUser(email, password,role){
+async signinUser(email, password){
   try{
-    const result = await pool.query(`SELECT * FROM users WHERE email = $1 and role = $2`, [email,role]);
+    const result = await pool.query(`SELECT * FROM users WHERE email = $1`, [email]);
     if(result.rows.length === 0) throw new Error('User not found');
     
     const user = result.rows[0];
