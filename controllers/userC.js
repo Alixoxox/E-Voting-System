@@ -7,18 +7,14 @@ import { redisClient } from '../server.js';
 import votesM from '../models/votesM.js';
 import userM from '../models/userM.js';
 import auditLogsM from '../models/auditLogsM.js';
+import pool from '../config/db.js';
 dotenv.config(); // loads variables from .env into process.env
 
 const SECRET_KEY = process.env.SECRET_KEY;
 class UserC{
 fetchUsers = async (req, res) => {
   try {
-    if(await redisClient.exists("AllUsersInfoAdmin")){
-      let cachedUsers=await redisClient.get("AllUsersInfoAdmin");
-      return res.json(JSON.parse(cachedUsers));
-    }
     const users = await UserM.getAllUsers();
-    await redisClient.setEx("AllUsersInfoAdmin", 900, JSON.stringify(users));
     return res.json(users);
   } catch (err) {
     console.error(err);
@@ -31,13 +27,12 @@ createUser = async (req, res) => {
     const {name,email, cnic, password, province, city, area} = req.body;
     const hashedPassword = await bcrypt.hash(password, 10);
     const result=await UserM.createUser(name, email, cnic, hashedPassword, province, city, area, 'user');
-    console.log('User created:', result);
-    const user={id:result.id,name:result.name,email:result.email,cnic:result.cnic,role:result.role,areaId:result.areaid,cityId:result.cityid,provinceId:result.provinceid};
-    const token=jwt.sign(user, SECRET_KEY, {expiresIn:'24h'})
-    return res.json({message:'User created successfully',token,user});
+    // Send OTP
+    await UserM.generateAndSendOtp(result.id, email);
+    return res.json({message:'User created successfully. Please verify your email using the OTP sent.', userId: result.id});
   }catch(Err){
     console.log(Err)
-    await auditLogsM.logAction(req,'FAILED_CREATE_USER','SYSTEM',{error:Err.message||'Failed to create user' ,email:req.body.email,status: 'Error'});
+    await auditLogsM.logAction(req,'FAILED_CREATE_USER','User_',{error:Err.message||'Failed to create user' ,email:req.body.email,status: 'Error'});
     return res.status(500).json({error:Err.message||'Failed to create user'})
   }
 }
@@ -45,13 +40,30 @@ signinUser = async (req, res) => {
   try{
     const {email, password} = req.body;
     const result=await UserM.signinUser(email, password);
-    const UserData={id:result.id,name:result.name,email:result.email,cnic:result.cnic,role:result.role,areaId:result.areaid,cityId:result.cityid,provinceId:result.provinceid};
+    console.log(result)
+    if(!result.is_verified){
+      return res.status(403).json({error:'Please verify your email before signing in.',userId: result.id});
+    }
+    const UserData={id:result.id,name:result.name,email:result.email};
     const token=jwt.sign(UserData, SECRET_KEY, {expiresIn:'24h'})
     return res.json({message:'User signed successfully',token,UserData});
   }catch(err){
     console.error(err);
-    await auditLogsM.logAction(req,'FAILED_USER_SIGNIN','SYSTEM',{ error:err.message||'Failed to sign in' ,email:req.body.email,status: 'Error'});
+    await auditLogsM.logAction(req,'FAILED_USER_SIGNIN','User_',{ error:err.message||'Failed to sign in' ,email:req.body.email,status: 'Error'});
     return res.status(500).json({error:err.message||'Failed to sign in'});
+  }
+}
+// 2. Verify Registration OTP (Step 2)
+verifyAccount = async (req, res) => {
+  try {
+    const { userId, otp } = req.body;
+    
+    await UserM.verifyOtp(userId, otp); // Check Redis
+    await UserM.markVerified(userId);   // Update DB
+
+    return res.json({ message: "Account verified! You can now log in." });
+  } catch (err) {
+    return res.status(400).json({ error: err.message });
   }
 }
 //search from candidate constituency
@@ -68,7 +80,7 @@ async viewCandidatesForUserElection(req,res){
     return res.json(candidates);
   }catch(err){
     console.error(err);
-    await auditLogsM.logAction(req,'FAILED_FETCH_CANDIDATES_FOR_USER_ELECTION','User_'+req.user.id,{ error:err.message||'Failed to fetch candidates for current Election' ,email:req.user.email,status: 'Error'});
+    await auditLogsM.logAction(req,'FAILED_FETCH_CANDIDATES_FOR_USER_ELECTION','Election_'+req.params.electionId,{ error:err.message||'Failed to fetch candidates for current Election' ,email:req.user.email,status: 'Error'});
     return res.status(500).json({error:err.message||'Failed to fetch candidates for current Election'});
   }
 }// Cast vote with leaderboard cache update
@@ -130,40 +142,84 @@ async votingHistory(req, res) {
   }
 }
 async adminSignin(req, res) {
-const {email,password}=req.body;
-try{
-  const result=await UserM.signinUser(email, password);
-  const AdminData={id:result.id,name:result.name,email:result.email,cnic:result.cnic,role:result.role,areaId:result.areaid,cityId:result.cityid,provinceId:result.provinceid};
-  const token=jwt.sign(AdminData, SECRET_KEY, {expiresIn:'24h'})
-  return res.json({message:'Admin signed successfully',token,AdminData});
-}catch(err){
-  console.error(err);
-  await auditLogsM.logAction(req,'FAILED_ADMIN_SIGNIN','SYSTEM',{ error:err.message||'Failed to sign in as admin' ,email:req.body.email,status: 'Error'});
-  return res.status(500).json({error:err.message||'Failed to sign in as admin'});
-}}
-async EditProfile(req, res){
-const userId=req.user.id;
-const {name,email,password}=req.body;
-try{
-  // Basic validation: Ensure at least one field is there
-  if (!name && !email && !password) {
-    return res.status(400).json({ error: "Please provide name, email, or password to update." });
-  }
-  await userM.EditProfile(userId,name,email,password);
-}catch(err){
-  console.error(err);
-  await auditLogsM.logAction(req,'FAILED_PROFILE_EDIT','User_'+userId,{ error:err.message||'Failed to edit profile' ,email:req.user.email,status: 'Error'});
-  return res.status(500).json({error:err.message||'Failed to edit profile'});}
-}
-async forgotPassword(req, res){
+  const {email,password}=req.body;
   try{
-  const {email,cnic,oldPassword,newPassword}=req.body; 
-  await UserM.resetPassword(email,cnic,oldPassword, newPassword)
-  return res.json({message:'Password reset successfully\nHead Over to Login Page'});
+    const result=await UserM.signinUser(email, password);
+
+    // Return Success but NO TOKEN yet
+    return res.json({ 
+      message: "Credentials verified. OTP sent to email.",
+      userId: result.id, // Frontend needs this ID to confirm the OTP
+      mfaRequired: true 
+    });
+
   }catch(err){
-  console.error(err);
-  await auditLogsM.logAction(req,'FAILED_PASSWORD_RESET','User_',{ error:err.message ,status: 'Error'});
-  return res.status(500).json({error:err.message||'Failed to reset password'});}
+    console.error(err);
+    await auditLogsM.logAction(req,'FAILED_ADMIN_SIGNIN','SYSTEM',{ error:err.message||'Failed to sign in as admin' ,email:req.body.email,status: 'Error'});
+    return res.status(500).json({error:err.message||'Failed to sign in as admin'});
+}}
+adminVerifyMFA = async (req, res) => {
+  try {
+    const { userId, otp } = req.body;
+
+    // 1. Verify OTP against Redis Cache
+    await UserM.verifyOtp(userId, otp);
+
+    // 2. Fetch User details again (needed to ensure latest role/data is in JWT)
+    const user = (await pool.query(`SELECT id, name, email FROM users WHERE id=$1`, [userId])).rows[0];
+
+    // 3. Issue Token
+    const UserData = { id: user.id,name:user.name ,email: user.email };
+    const token = jwt.sign(UserData, SECRET_KEY, { expiresIn: '24h' });
+    return res.json({ message: "Login successful", token, UserData });
+  } catch (err) {
+    // Note: Errors here are typically 'Invalid OTP' or 'OTP expired'
+    await logAction(req, 'MFA_FAILED', `User_${req.body.userId}`, { error: err.message });
+    return res.status(401).json({ error: err.message });
+  }
 }
+async EditProfile(req, res){
+  const userId=req.user.id;
+  const {name,email,password}=req.body;
+  try{
+    // Basic validation: Ensure at least one field is there
+    if (!name && !email && !password) {
+      return res.status(400).json({ error: "Please provide name, email, or password to update." });
+    }
+    await userM.EditProfile(userId,name,email,password);
+  }catch(err){
+    console.error(err);
+    await auditLogsM.logAction(req,'FAILED_PROFILE_EDIT','User_'+userId,{ error:err.message||'Failed to edit profile' ,email:req.user.email,status: 'Error'});
+    return res.status(500).json({error:err.message||'Failed to edit profile'});}
+}
+
+async forgotPasswordRequest(req, res) {
+  try {
+    const { email, cnic } = req.body;
+    // Find User
+    const resDb = await pool.query("SELECT id FROM users WHERE email=$1 AND cnic=$2", [email, cnic]);
+    
+    if (!resDb || resDb.rows.length === 0) throw new Error("User not found");
+    
+    const userId = resDb.rows[0].id;
+    await UserM.generateAndSendOtp(userId, email);
+    
+    return res.json({ message: "OTP sent to email", userId });
+  } catch (err) {
+    return res.status(400).json({ error: err.message });
+  }
+}
+async resetPasswordWithOtp(req, res) {
+  try {
+    const { userId, otp, newPassword } = req.body;
+    await UserM.verifyOtp(userId, otp);
+    const hashedPassword = await bcrypt.hash(newPassword, 10);
+    await pool.query("UPDATE users SET password = $1 WHERE id = $2", [hashedPassword, userId]);
+    return res.json({ message: "Password reset successfully" });
+  } catch (err) {
+    return res.status(400).json({ error: err.message });
+  }
+}
+
 }
 export default new UserC()

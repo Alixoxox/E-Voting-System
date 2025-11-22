@@ -55,11 +55,11 @@ const swaggerSpec = swaggerJsdoc(swaggerOptions);
   app.use('/api/admin',AdminRoutes);
   // 4️⃣ Start server
   io.on("connection", (socket) => {
-    console.log("🔌 User connected:", socket.id);
+    console.log(" User connected:", socket.id);
   
     socket.on("joinRoom", async (room) => {
       socket.join(room);
-      console.log(`✅ Joined room: ${room}`);
+      console.log(`Joined room: ${room}`);
   
       // Extract areaId & electionId from room name: "const-<areaId>-<electionId>"
       const [_, areaId, electionId] = room.split("-");
@@ -87,7 +87,7 @@ const swaggerSpec = swaggerJsdoc(swaggerOptions);
     });
   });
   server.listen(5000, () => {
-    console.log(`✅ Server running on port 5000`);
+    console.log(`  Server running on port 5000`);
     console.log(`📚 Swagger docs: http://localhost:5000/api-docs`);
   });
   

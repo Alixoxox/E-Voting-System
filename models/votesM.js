@@ -10,6 +10,8 @@ class votesM {
             userId INTEGER REFERENCES users(id),
             candidateConstId INTEGER REFERENCES candidateConstituency(id),
             electionId INTEGER REFERENCES elections(id),
+            previous_hash VARCHAR(256),
+            current_hash VARCHAR(256),
             castedAt DATE DEFAULT CURRENT_DATE,
             UNIQUE (userId, electionId));`
       await pool.query(sql);
@@ -28,7 +30,26 @@ class votesM {
         throw new Error('Error fetching votes');
         }
     }
-    async CastVote(candidateParticipatingId,userId,electionId){
+    // helper function : for fetching previous hash votes if one vote is deleted then chain breaks
+    async getLastVoteHash(electionId) {
+      try {
+        const sql = `
+          SELECT current_hash 
+          FROM votes 
+          WHERE electionId = $1 
+          ORDER BY id DESC 
+          LIMIT 1;
+        `;
+        const result = await pool.query(sql, [electionId]);
+        
+        // If result is empty, it means this is the FIRST vote (Genesis)
+        return result.rows.length > 0 ? result.rows[0].current_hash : null;
+      } catch (err) {
+        console.error("Error getting last hash:", err);
+        throw new Error('Error fetching voting chain');
+      }
+    }
+    async CastVote(candidateParticipatingId, userId, electionId, previousHash, currentHash){
       try{
         // Check if the user has already voted in this election
         const voteCheck = await pool.query(`
@@ -40,11 +61,11 @@ class votesM {
           return { message: 'User has already casted his vote' };
         }
     
-        // Record the vote
+        // Record the vote WITH HASHES
         await pool.query(`
-          INSERT INTO votes (userId, candidateConstid, electionId) 
-          VALUES ($1, $2, $3)
-        `, [userId, candidateParticipatingId, electionId]);
+          INSERT INTO votes (userId, candidateConstid, electionId, previous_hash, current_hash) 
+          VALUES ($1, $2, $3, $4, $5)
+        `, [userId, candidateParticipatingId, electionId, previousHash, currentHash]);
     
         // Increment the total votes for the candidate in candidateConstituency
         await pool.query(`
@@ -87,5 +108,54 @@ class votesM {
       throw new Error('Error fetching voting history');
     }
     }
+
+    // Verify Votes
+  verifyElectionIntegrity = async (req, res) => {
+  try {
+    const { electionId } = req.params;
+
+    // 1. Get all votes for this election, ordered by ID
+    const { rows: votes } = await db.query(
+      `SELECT id, previous_hash, current_hash FROM votes WHERE electionId = $1 ORDER BY id ASC`,
+      [electionId]
+    );
+
+    if (votes.length === 0) return res.json({ status: "Clean", message: "No votes cast yet." });
+
+    const brokenLinks = [];
+
+    // 2. Loop through votes (Start at index 1, skip Genesis)
+    for (let i = 1; i < votes.length; i++) {
+      const currentVote = votes[i];
+      const previousVote = votes[i - 1];
+
+      // 3. THE CHECK: Does my 'previous' match the last guy's 'current'?
+      if (currentVote.previous_hash !== previousVote.current_hash) {
+        brokenLinks.push({
+          brokenAtVoteID: currentVote.id,
+          expected: previousVote.current_hash,
+          found: currentVote.previous_hash
+        });
+      }
+    }
+
+    // 4. Report Results
+    if (brokenLinks.length > 0) {
+      // Log this serious security event!
+      await logAction(req, 'INTEGRITY_CHECK_FAILED', electionId, { errors: brokenLinks });
+      
+      return {
+        status: "Compromised",
+        message: "🚨 Tampering Detected! The blockchain is broken.",
+        details: brokenLinks
+      };
+    }
+
+    return { status: "Secure", message: "  Verification Passed. All hashes match." };
+
+  } catch (err) {
+    return { error: err.message };
+  }
+}
 }
 export default new votesM();

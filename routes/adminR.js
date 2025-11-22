@@ -342,6 +342,45 @@ router.post('/party/upload-csv',authenicator, upload.single('file'), Parties.Add
  */
 router.post('/auth/signin', userC.adminSignin);
 
+
+/**
+ * @swagger
+ * /api/admin/auth/verify-mfa:
+ *   post:
+ *     summary: Admin Login Step 2 — Verify OTP
+ *     tags: [Admin]
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [userId, otp]
+ *             properties:
+ *               userId:
+ *                 type: integer
+ *                 example: 1
+ *               otp:
+ *                 type: string
+ *                 example: "999888"
+ *     responses:
+ *       200:
+ *         description: Login successful, token issued
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 token:
+ *                   type: string
+ *                 userData:
+ *                   type: object
+ *       401:
+ *         description: Invalid OTP
+ */
+router.post('/auth/verify-mfa', userC.adminVerifyMFA);
+
+
 /**
  * @swagger
  * /api/admin/EditProfile:
@@ -379,41 +418,51 @@ router.post('/auth/signin', userC.adminSignin);
  */
 router.post('/EditProfile', authenicator, userC.EditProfile);
 
+
 /**
  * @swagger
- * /api/admin/ForgotPassword:
- *   post:
- *     summary: Reset admin password
+ * /api/admin/verify/integrity/{electionId}:
+ *   get:
+ *     summary: Verify Election Integrity (Blockchain Audit)
+ *     description: Checks the cryptographic hash chain for a specific election to detect tampering.
  *     tags: [Admin]
- *     requestBody:
- *       required: true
- *       content:
- *         application/json:
- *           schema:
- *             type: object
- *             required: [email, cnic, oldPassword, newPassword]
- *             properties:
- *               email:
- *                 type: string
- *                 format: email
- *                 example: "user@example.com"
- *               cnic:
- *                 type: string
- *                 example: "00000-0000000-0"
- *               oldPassword:
- *                 type: string
- *                 format: password
- *                 example: "oldPass123"
- *               newPassword:
- *                 type: string
- *                 format: password
- *                 example: "newPass123"
+ *     parameters:
+ *       - in: path
+ *         name: electionId
+ *         required: true
+ *         schema:
+ *           type: integer
+ *         description: ID of the election to verify
+ *         example: 5
  *     responses:
  *       200:
- *         description: Password reset successfully
+ *         description: Verification result (Secure or Compromised)
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 status:
+ *                   type: string
+ *                   enum: [Secure, Clean, Compromised]
+ *                   example: "Secure"
+ *                 message:
+ *                   type: string
+ *                   example: " Verification Passed. All hashes match."
+ *                 details:
+ *                   type: array
+ *                   items:
+ *                     type: object
+ *                     properties:
+ *                       brokenAtVoteID:
+ *                         type: integer
+ *                       expected:
+ *                         type: string
+ *                       found:
+ *                         type: string
  *       500:
  *         description: Server error
  */
-router.post('/ForgotPassword', userC.forgotPassword);
+router.get('/verify/integrity/:electionId', authenicator, ElectionC.verifyElectionIntegrity);
 
 export default router;

@@ -1,5 +1,8 @@
 import pool from "../config/db.js";
 import bcrypt from 'bcrypt';
+import { redisClient } from "../server.js";
+import crypto from 'crypto';
+import { sendOTP } from "../utils/emailservice.js";
 class UserM {
   async createTable() {
     try {
@@ -13,9 +16,8 @@ class UserM {
       provinceId INTEGER REFERENCES province(id),
       cityId INTEGER REFERENCES city(id),
       areaId INTEGER REFERENCES area(id),
-      failed_attempts INTEGER DEFAULT 0,
-      lockout_until TIMESTAMP default NULL,
-      role VARCHAR(20) CHECK (role IN ('admin', 'user', 'candidate')) DEFAULT 'user',    
+      role VARCHAR(20) CHECK (role IN ('admin', 'user', 'candidate')) DEFAULT 'user',
+      is_verified BOOLEAN DEFAULT FALSE,    
       created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP);`
       await pool.query(sql);
       console.log("Users table created or already exists.");
@@ -35,6 +37,7 @@ class UserM {
   }
   async createUser(name, email, cnic, password, province, city, area,role) {
   try{
+    console.log('Creating user with:', name, email, cnic, province, city, area, role);
     let result = await pool.query(`
       SELECT p.id AS province_id, c.id AS city_id, a.id AS area_id
       FROM province p
@@ -46,7 +49,11 @@ class UserM {
       throw new Error('Invalid province, city, or area name');
     }
     const { province_id, city_id, area_id } = result.rows[0];
-    result=await pool.query(`INSERT INTO users (name, email, cnic, password, provinceId, cityId, areaId, role) VALUES ($1, $2, $3, $4, $5, $6, $7, $8) Returning *`, [name, email, cnic, password, province_id, city_id, area_id,role ]);
+    let is_verified=false;
+    if(role==='admin'||role==='candidate'){
+    is_verified=true;
+    }
+    result=await pool.query(`INSERT INTO users (name, email, cnic, password, provinceId, cityId, areaId, role, is_verified) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9) Returning *`, [name, email, cnic, password, province_id, city_id, area_id,role,is_verified ]);
     return result.rows[0];
   }catch(err){
     if (err.code === '23505') {
@@ -56,37 +63,48 @@ class UserM {
   }
 }
 async signinUser(email, password){
-  try{
-    const result = await pool.query(`SELECT * FROM users WHERE email = $1`, [email]);
-    if(result.rows.length === 0) throw new Error('User not found');
-    
-    const user = result.rows[0];
-    if (user.lockout_until && new Date() < new Date(user.lockout_until)) {
-      const timeLeft = Math.ceil((new Date(user.lockout_until) - new Date()) / 60000);
-      throw new Error(`Account locked. Try again in ${timeLeft} minutes.`);
+  const ATTEMPTS_KEY = `login:attempts:${email}`;
+  const LOCK_KEY = `login:locked:${email}`;
+  const MAX_ATTEMPTS = 5;
+  const LOCK_DURATION = 15 * 60; // 15 minutes in seconds
+
+  try {
+    // 1. CHECK: Is account currently locked in Redis?
+    const isLocked = await redisClient.get(LOCK_KEY);
+    if (isLocked) {
+      const ttl = await redisClient.ttl(LOCK_KEY); // Get remaining time
+      const minutes = Math.ceil(ttl / 60);
+      throw new Error(`Account locked. Try again in ${minutes} minutes.`);
     }
+
+    // 2. Find User (Main DB)
+    const res = await pool.query(`SELECT id, name, email, password,is_verified FROM users WHERE email = $1`, [email]);
+    if (res.rows.length === 0) throw new Error('User not found');
+    const user = res.rows[0];
     const isMatch = await bcrypt.compare(password, user.password);
-    if(!isMatch){
-      const newFailCount = (user.failed_attempts || 0) + 1;
-      // account lockout logic >=5 attempts stall for 15 mins
-      if (newFailCount >= 5) {
-        // Lock for 15 minutes
-        const lockTime = new Date(Date.now() + 15 * 60 * 1000);
-        await pool.query(`UPDATE users SET failed_attempts = 0, lockout_until = $1 WHERE id = $2`, [lockTime, user.id]);
+    if (!isMatch) {
+      // Increment attempts in Redis
+      const attempts = await redisClient.incr(ATTEMPTS_KEY);
+      
+      if (attempts === 1) {
+        // Set expiry for the count itself (e.g., reset count after 1 hour if not locked)
+        await redisClient.expire(ATTEMPTS_KEY, 3600);
+      }
+
+      if (attempts >= MAX_ATTEMPTS) {
+        // LOCK THE ACCOUNT
+        await redisClient.setEx(LOCK_KEY, LOCK_DURATION, '1'); // Lock for 15 mins
+        await redisClient.del(ATTEMPTS_KEY); // Reset counter so it starts fresh after lock
         throw new Error('Too many failed attempts. Account locked for 15 mins.');
       } else {
-        // Just count the failure
-        await pool.query(`UPDATE users SET failed_attempts = $1 WHERE id = $2`, [newFailCount, user.id]);
-        throw new Error(`Invalid password. ${5 - newFailCount} attempts remaining.`);
+        throw new Error(`Invalid password. ${MAX_ATTEMPTS - attempts} attempts remaining.`);
       }
     }
-    if (user.failed_attempts > 0 || user.lockout_until) {
-      await pool.query(`UPDATE users SET failed_attempts = 0, lockout_until = NULL WHERE id = $1`, [user.id]);
-    }
+    // Clear any existing attempts upon success
+    await redisClient.del(ATTEMPTS_KEY);
     return user;
-  }catch(err){
-    console.error('Error signing in user:', err);
-    throw new Error(err.message||'Error signing in user');
+  } catch (err) {
+    throw err;
   }
 }
 async viewCandidatesForUserElection(areaId, electionId){
@@ -158,21 +176,64 @@ async PutAdmin(admins){
     console.log(`Admin ${admin.name} Already Present`);
   } }
 }
-async resetPassword(email,cnic,oldPassword, newPassword){
-  try{
-    const findIfPresent=await pool.query(`SELECT * FROM users WHERE email = $1 and cnic = $2`, [email, cnic]);
-    if(findIfPresent.rows.length === 0){
-      throw new Error('User not found');
+
+async generateAndSendOtp(userId, email) {
+  const OTP_COOLDOWN_KEY = `otp:cooldown:${userId}`;
+  const OTP_LIMIT_KEY = `otp:limit:${userId}`;  
+  const COOLDOWN_TIME = 60;   // 60 seconds wait time
+  const LIMIT_WINDOW = 3600;  // 1 hour window
+  const MAX_REQUESTS = 3;     // Max 3 OTPs per hour
+
+  try {
+    // 1. CHECK COOLDOWN (Prevent spamming the button)
+    const isCoolingDown = await redisClient.get(OTP_COOLDOWN_KEY);
+    if (isCoolingDown) {
+      const ttl = await redisClient.ttl(OTP_COOLDOWN_KEY);
+      throw new Error(`Please wait ${ttl} seconds before requesting another code.`);
     }
-    const isMatch = await bcrypt.compare(oldPassword, findIfPresent.rows[0].password);
-    if(!isMatch){
-      throw new Error('Old password is incorrect');
+
+    // 2. CHECK HOURLY LIMIT (Prevent abuse)
+    const requestCount = await redisClient.incr(OTP_LIMIT_KEY);
+    
+    // If this is the first request, set the 1-hour expiry
+    if (requestCount === 1) {
+      await redisClient.expire(OTP_LIMIT_KEY, LIMIT_WINDOW);
     }
-    const hashedPassword = await bcrypt.hash(newPassword, 10);
-    await pool.query(`UPDATE users SET password = $1 WHERE email = $2 and cnic = $3 and id= $4`, [hashedPassword, email, cnic,findIfPresent.rows[0].id]);
-  }catch(err){
-    throw new Error(err.message || 'Error resetting password');
+
+    if (requestCount > MAX_REQUESTS) {
+      const ttl = await redisClient.ttl(OTP_LIMIT_KEY);
+      const minutes = Math.ceil(ttl / 60);
+      throw new Error(`Too many OTP requests. Try again in ${minutes} minutes.`);
+    }
+
+    // 3. GENERATE & STORE OTP (Your existing logic)
+    const otp = crypto.randomInt(100000, 999999).toString();
+    await redisClient.setEx(`otp:${userId}`, 600, otp); // OTP valid for 10 mins
+
+    // 4. SET COOLDOWN (Lock requests for 60s)
+    await redisClient.setEx(OTP_COOLDOWN_KEY, COOLDOWN_TIME, '1');
+    await sendOTP(email, otp);
+    return otp; 
+  } catch (err) {
+    throw err; 
   }
+}
+// 2. Verify OTP
+async verifyOtp(userId, inputCode) {
+  const storedCode = await redisClient.get(`otp:${userId}`);
+
+  if (!storedCode) throw new Error("OTP has expired. Please request a new one.");
+  if (storedCode !== inputCode) throw new Error("Invalid OTP code.");
+
+  // Delete OTP after use so it can't be used twice
+  await redisClient.del(`otp:${userId}`);
+  
+  return true;
+}
+
+// 3. Mark User as Verified (for Registration)
+async markVerified(userId) {
+  await pool.query(`UPDATE users SET is_verified = TRUE WHERE id = $1`, [userId]);
 }
 }
 export default new UserM();

@@ -74,7 +74,36 @@ const router = express.Router();
  *         description: Server error
  */
 
-router.post("/account/create", UserC.createUser);/**
+router.post("/account/create", UserC.createUser);
+/**
+ * @swagger
+ * /api/users/account/verify:
+ *   post:
+ *     summary: Verify Account (Registration Step 2)
+ *     tags: [User]
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [userId, otp]
+ *             properties:
+ *               userId:
+ *                 type: integer
+ *                 example: 55
+ *               otp:
+ *                 type: string
+ *                 example: "123456"
+ *     responses:
+ *       200:
+ *         description: Account verified successfully
+ *       400:
+ *         description: Invalid or expired OTP
+ */
+router.post('/account/verify', userC.verifyAccount);
+
+/**
 * @swagger
 * /api/users/account/signin:
 *   post:
@@ -234,42 +263,4 @@ router.post('/cast/vote',authenicator,UserC.castVote);
  *         description: Server error
  */
 router.post('/EditProfile', authenicator, userC.EditProfile);
-
-/**
- * @swagger
- * /api/user/ForgotPassword:
- *   post:
- *     summary: Reset user password
- *     tags: [User]
- *     requestBody:
- *       required: true
- *       content:
- *         application/json:
- *           schema:
- *             type: object
- *             required: [email, cnic, oldPassword, newPassword]
- *             properties:
- *               email:
- *                 type: string
- *                 format: email
- *                 example: "user@example.com"
- *               cnic:
- *                 type: string
- *                 example: "00000-0000000-0"
- *               oldPassword:
- *                 type: string
- *                 format: password
- *                 example: "oldPass123"
- *               newPassword:
- *                 type: string
- *                 format: password
- *                 example: "newPass123"
- *     responses:
- *       200:
- *         description: Password reset successfully
- *       500:
- *         description: Server error
- */
-router.post('/ForgotPassword', userC.forgotPassword);
-
 export default router;

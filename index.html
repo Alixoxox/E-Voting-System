@@ -25,7 +25,7 @@
     const leaderboardEl = document.getElementById("leaderboard");
 
     socket.on("connect", () => {
-      statusEl.textContent = "✅ Connected (" + socket.id + ")";
+      statusEl.textContent = "  Connected (" + socket.id + ")";
     });
 
     socket.on("disconnect", () => {

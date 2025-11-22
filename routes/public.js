@@ -6,6 +6,7 @@ import AreasC from '../controllers/areaC.js';
 import ProvinceC from '../controllers/ProvinceC.js';
 import ConstituencyC from '../controllers/ConstituencyC.js';
 import Parties from '../controllers/partyC.js';
+import userC from '../controllers/userC.js';
 const router = express.Router();
 
 /**
@@ -94,6 +95,61 @@ router.get('/areas', AreasC.getAreas);
  *         description: Server error
  */
 router.get('/cities', cityC.getCities);
+
+/**
+ * @swagger
+ * /api/public/password/forgot:
+ *   post:
+ *     summary: Request Password Reset (Sends OTP) (Step 1 password reset) [For both User And Admin]
+ *     tags: [Public]
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [email, cnic]
+ *             properties:
+ *               email:
+ *                 type: string
+ *                 format: email
+ *               cnic:
+ *                 type: string
+ *     responses:
+ *       200:
+ *         description: OTP sent to email
+ *       404:
+ *         description: User not found
+ */
+router.post('/password/forgot', userC.forgotPasswordRequest);
+/**
+ * @swagger
+ * /api/public/password/reset:
+ *   post:
+ *     summary: Reset Password Using OTP (Step 2 password reset) [For both User And Admin]
+ *     tags: [Public]
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [userId, otp, newPassword]
+ *             properties:
+ *               userId:
+ *                 type: integer
+ *               otp:
+ *                 type: string
+ *               newPassword:
+ *                 type: string
+ *                 format: password
+ *     responses:
+ *       200:
+ *         description: Password updated successfully
+ *       400:
+ *         description: Invalid OTP
+ */
+router.post('/password/reset', userC.resetPasswordWithOtp);
 
 /**
  * @swagger

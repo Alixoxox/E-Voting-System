@@ -1,5 +1,6 @@
 import auditLogsM from "../models/auditLogsM.js";
 import ElectionM from "../models/ElectionM.js";
+import votesM from "../models/votesM.js";
 import { redisClient } from "../server.js";
 class ElectionC{
 getElections = async (req, res) => {
@@ -46,5 +47,18 @@ CreateEllection = async (req, res) => {
     await auditLogsM.logAction(req,'FAILED_FETCH_ACTIVE_ELECTIONS' ,'User_'+req.user.id,{ error:err.message||'Failed to fetch active elections' ,email:req.user.email,status: 'Error'});
     res.status(500).json({ error: err.message||'Failed to fetch active elections' });
   }}
+
+  async verifyElectionIntegrity(req,rea){
+    try{
+      const {electionId}=req.params;
+      const result=await votesM.verifyElectionIntegrity(electionId);
+      await auditLogsM.logAction(req,'VERIFY_ELECTION_INTEGRITY' ,'Votes_'+req.user.id,{ electionId: electionId, msg: "Election integrity verified successfully" ,status: 'Success'});
+      return res.json({message:'Election integrity verified successfully',result});
+    }catch(err){
+      console.error(err);
+      await auditLogsM.logAction(req,'FAILED_VERIFY_ELECTION_INTEGRITY' ,'Votes_',{ error:err.message||'Failed to verify election integrity' ,email:req.user.email,status: 'Error'});
+      res.status(500).json({ error: err.message||'Failed to verify election integrity' });
+    }
+  }
 }
 export default new ElectionC();

@@ -54,7 +54,7 @@ class Parties {
       let hashedpass=bcrypt.hash(password,10)
       let result= await partyM.createParty(name, abbreviation, imageUrl,email,hashedpass);
 
-      const PartyData={id:result.id,name:result.name,email:result.email,role:'party', abbreviation:result.abbreviation,logo:result.logo};
+      const PartyData={id:result.id,name:result.name,email:result.email};
       const token=jwt.sign(PartyData, SECRET_KEY, {expiresIn:'24h'})
       await auditLogsM.logAction(req,'PARTY_CREATED','Party_'+result.id,{partyName:result.name,partyEmail:result.email,status: 'Success'});
       return res.json({ message: "Party created successfully" ,PartyData,token});
@@ -68,7 +68,7 @@ class Parties {
     try {
       const { email, password } = req.body;
       const result = await partyM.LoginParty(email, password);
-      const PartyData={id:result.id,name:result.name,email:result.email,role:'party', abbreviation:result.abbreviation,logo:result.logo};
+      const PartyData={id:result.id,name:result.name,email:result.email};
       const token=jwt.sign(PartyData, SECRET_KEY, {expiresIn:'24h'})
       return res.json({ message: "Party logged in successfully",PartyData,token });
     } catch (err) {
