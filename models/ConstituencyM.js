@@ -30,8 +30,9 @@ class ConstituencyM{
         }
     }
     async insertConstituenciesFastest(data) {
+        const client = await db.connect();
         try {
-            // 1️⃣ Bulk insert constituencies
+            await client.query('BEGIN');
             const constituencyValues = data.map(item => [
                 item.code,
                 item.name,
@@ -71,12 +72,15 @@ class ConstituencyM{
                     ON CONFLICT DO NOTHING;
                 `, junctionValues));
             }
-    
+            await client.query('COMMIT');
             console.log('Constituencies and area links inserted successfully ');
     
         } catch (err) {
+            await client.query('ROLLBACK');
             console.error('Error inserting constituencies in bulk:', err);
             throw err;
+        }finally{
+            client.release();
         }
     
 }

@@ -31,7 +31,9 @@ class partyM{
         }
     }
     async addParties(parties){
+      const client = await db.connect();
         try {
+          await client.query('BEGIN');
           const values = [];
           const rows = [];
       
@@ -48,10 +50,13 @@ class partyM{
           `;
       
           await db.query(sql, values);
-          
+          await client.query('COMMIT');
         } catch (err) {
           console.error('Error inserting parties:', err);
+          await client.query('ROLLBACK');
           throw err;
+        }finally{
+          client.release();
         }
       };
 

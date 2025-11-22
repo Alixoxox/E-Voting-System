@@ -178,13 +178,14 @@ async PutAdmin(admins){
 
 async generateAndSendOtp(userId, email) {
   const OTP_COOLDOWN_KEY = `otp:cooldown:${userId}`;
-  const OTP_LIMIT_KEY = `otp:limit:${userId}`;  
-  const COOLDOWN_TIME = 60;   // 60 seconds wait time
+  const OTP_LIMIT_KEY = `otp:limit:${userId}`;
+  const OTP_COOLDOWN_LEVEL_KEY = `otp:cooldownLevel:${userId}`;
+  const COOLDOWN_TIMES = [60, 300, 900, 1800]; // 1 min, 5 min, 15 min
   const LIMIT_WINDOW = 3600;  // 1 hour window
-  const MAX_REQUESTS = 3;     // Max 3 OTPs per hour
+  const MAX_REQUESTS = 4;     // Max 3 OTPs per hour
 
   try {
-    // 1. CHECK COOLDOWN (Prevent spamming the button)
+    // 1. CHECK COOLDOWN (Prevent spamming)
     const isCoolingDown = await redisClient.get(OTP_COOLDOWN_KEY);
     if (isCoolingDown) {
       const ttl = await redisClient.ttl(OTP_COOLDOWN_KEY);
@@ -193,28 +194,31 @@ async generateAndSendOtp(userId, email) {
 
     // 2. CHECK HOURLY LIMIT (Prevent abuse)
     const requestCount = await redisClient.incr(OTP_LIMIT_KEY);
-    
-    // If this is the first request, set the 1-hour expiry
     if (requestCount === 1) {
       await redisClient.expire(OTP_LIMIT_KEY, LIMIT_WINDOW);
     }
-
     if (requestCount > MAX_REQUESTS) {
       const ttl = await redisClient.ttl(OTP_LIMIT_KEY);
       const minutes = Math.ceil(ttl / 60);
       throw new Error(`Too many OTP requests. Try again in ${minutes} minutes.`);
     }
 
-    // 3. GENERATE & STORE OTP (Your existing logic)
+    // 3. GENERATE & STORE OTP
     const otp = crypto.randomInt(100000, 999999).toString();
-    await redisClient.setEx(`otp:${userId}`, 600, otp); // OTP valid for 10 mins
+    await redisClient.setEx(`otp:${userId}`, 600, otp); // 10 mins validity
 
-    // 4. SET COOLDOWN (Lock requests for 60s)
-    await redisClient.setEx(OTP_COOLDOWN_KEY, COOLDOWN_TIME, '1');
+    // 4. PROGRESSIVE COOLDOWN
+    let level = await redisClient.get(OTP_COOLDOWN_LEVEL_KEY) || 0;
+    level = parseInt(level);
+    const cooldownTime = COOLDOWN_TIMES[Math.min(level, COOLDOWN_TIMES.length - 1)];
+
+    await redisClient.setEx(OTP_COOLDOWN_KEY, cooldownTime, '1');
+    await redisClient.setEx(OTP_COOLDOWN_LEVEL_KEY, LIMIT_WINDOW, (level + 1).toString());    // 5. SEND OTP
     await sendOTP(email, otp);
-    return otp; 
+    return otp;
+
   } catch (err) {
-    throw err; 
+    throw err;
   }
 }
 // 2. Verify OTP

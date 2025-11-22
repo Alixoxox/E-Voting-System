@@ -29,14 +29,12 @@ class ProvinceC {
         if(data.length === 0) return res.status(400).json({ error: 'CSV file is empty or has no valid data' });
         // now insert to db
         await ProvinceM.AddProvinceCsv(data)
-        await  auditLogsM.logAction(req,'PROVINCES_CSV_UPLOAD','PROVINCES_CSV_UPLOAD',{rowsAdded:data.length,status: 'Success'});
+        await auditLogsM.logAction(req,'PROVINCES_CSV_UPLOAD','PROVINCES_CSV_UPLOAD',{rowsAdded:data.length,status: 'Success'});
         return res.json({ message: 'Provinces added successfully' });
-
-    }    catch(err){
+    }catch(err){
         console.error(err);
         await auditLogsM.logAction(req,'PROVINCES_CSV_UPLOAD_FAILED','PROVINCES_CSV_UPLOAD_FAILED',{error:err.message,status: 'Error'});
-        res.status(500).json({ error: 'Failed to add provinces from CSV\n'+err });}
-
-    }
+        res.status(500).json({ error: 'Failed to add provinces from CSV\n'+err });
+    }}
 }
 export default new ProvinceC();

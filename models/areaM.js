@@ -27,7 +27,9 @@ class areaM {
   }
 
   async AddAreasCsv(cities) {
+    const client = await pool.connect();
     try {
+      await client.query('BEGIN');
       const { rows: City } = await db.query("SELECT id, name FROM city");
       const cityMap = {};
       City.forEach((p) => {
@@ -47,9 +49,8 @@ class areaM {
           return [areaName, cityId];
         })
         .filter(Boolean); // remove nulls
-      if (!values.length) {
-        console.log("No valid cities to insert.");
-        return;
+      if (!values.length|| values.length===0) {
+        throw new Error("No valid cities to insert.");
       }
       // pg-format builds placeholders automatically
       const sql = format(
@@ -60,14 +61,18 @@ class areaM {
         `,
         values
       );
-        const result=await db.query(sql);
+        const result=await client.query(sql);
+        await pool.query('COMMIT');
         await logAction(req, 'BULK_AREA_ADD', 'Bulk_Upload', { 
           count: result.rowCount, 
           status: 'Success' 
       });
     } catch (err) {
+      await client.query('ROLLBACK');
       console.error("Error inserting cities:", err);
       throw err;
+    }finally {
+      client.release();
     }
   }
 }

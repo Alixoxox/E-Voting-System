@@ -23,7 +23,9 @@ class ProvinceM{
         }
     }
     async AddProvinceCsv(provinces){
-        try {
+    const client = await db.connect();
+      try {
+          await client.query('BEGIN');
           const values = [];
           const rows = [];
       
@@ -39,10 +41,13 @@ class ProvinceM{
           `;
       
           await db.query(sql, values);
-          
+          await client.query('COMMIT');
         } catch (err) {
           console.error('Error inserting provinces:', err);
+          await client.query('ROLLBACK');
           throw err;
+        }finally{
+          client.release();
         }
       }
 }

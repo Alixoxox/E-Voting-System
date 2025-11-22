@@ -28,8 +28,9 @@ class cityM{
         }
     }
     async AddCitycsv(cities) {
+      const client = await db.connect();
     try {
-      // Get all provinces from DB
+      await client.query('BEGIN');
       const { rows: provinces } = await db.query('SELECT id, name FROM province');
       
       const provinceMap = {};
@@ -66,13 +67,17 @@ class cityM{
       );
 
  const result=await db.query(sql);
+ await client.query('COMMIT');
  await logAction(req, 'BULK_CITY_ADD', 'Bulk_Upload', { 
   count: result.rowCount, 
   status: 'Success' 
 });
     } catch (err) {
+      await client.query('ROLLBACK');
       console.error('Error inserting cities:', err);
       throw err;
+    }finally {
+      client.release();
     }
   }
 }
