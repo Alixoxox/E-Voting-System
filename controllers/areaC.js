@@ -24,7 +24,7 @@ class AreasC{
     const required = ['name', 'city'];
     const data = await parseCsvWithValidation(req.file.path, required);
     // now insert to db
-    areaM.AddAreasCsv(data)
+    await areaM.AddAreasCsv(data)
     await auditLogsM.logAction(req,'AREAS_CSV_UPLOAD','AREAS_CSV_UPLOAD',{rowsAdded:data.length,status: 'Success'});
     return res.json({ message: 'Areas added successfully' });    
   }catch(err){

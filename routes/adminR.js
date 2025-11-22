@@ -8,7 +8,7 @@ import ConstituencyC from '../controllers/ConstituencyC.js';
 import Parties from '../controllers/partyC.js';
 import userC from '../controllers/userC.js';
 import { authenicator } from '../middleware/authenicator.js';
-
+import adminC from '../controllers/adminC.js';
 const router = express.Router();
 const upload = multer({ dest: 'uploads/' }); // temporary storage
 
@@ -340,7 +340,7 @@ router.post('/party/upload-csv',authenicator, upload.single('file'), Parties.Add
  *       500:
  *         description: Server error
  */
-router.post('/auth/signin', userC.adminSignin);
+router.post('/auth/signin', adminC.adminSignin);
 
 
 /**
@@ -378,8 +378,7 @@ router.post('/auth/signin', userC.adminSignin);
  *       401:
  *         description: Invalid OTP
  */
-router.post('/auth/verify-mfa', userC.adminVerifyMFA);
-
+router.post('/auth/verify-mfa', adminC.adminVerifyMFA);
 
 /**
  * @swagger
@@ -417,7 +416,6 @@ router.post('/auth/verify-mfa', userC.adminVerifyMFA);
  *         description: Server error
  */
 router.post('/EditProfile', authenicator, userC.EditProfile);
-
 
 /**
  * @swagger
@@ -465,4 +463,31 @@ router.post('/EditProfile', authenicator, userC.EditProfile);
  */
 router.get('/verify/integrity/:electionId', authenicator, ElectionC.verifyElectionIntegrity);
 
+// show audit logs to admin
+/**
+ * @swagger
+ * /api/admin/view/auditLogs:
+ *   get:
+ *     summary: Get paginated audit logs
+ *     tags: [Admin]
+ *     parameters:
+ *       - in: query
+ *         name: page
+ *         schema:
+ *           type: integer
+ *           default: 1
+ *         description: Page number
+ *       - in: query
+ *         name: limit
+ *         schema:
+ *           type: integer
+ *           default: 10
+ *         description: Number of logs per page
+ *     responses:
+ *       200:
+ *         description: Paginated audit logs retrieved successfully
+ *       500:
+ *         description: Server error
+ */
+router.get('/view/auditLogs',adminC.FetchAuditLogs);
 export default router;

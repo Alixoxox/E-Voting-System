@@ -37,7 +37,6 @@ class UserM {
   }
   async createUser(name, email, cnic, password, province, city, area,role) {
   try{
-    console.log('Creating user with:', name, email, cnic, province, city, area, role);
     let result = await pool.query(`
       SELECT p.id AS province_id, c.id AS city_id, a.id AS area_id
       FROM province p

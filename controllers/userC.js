@@ -49,7 +49,6 @@ signinUser = async (req, res) => {
     return res.json({message:'User signed successfully',token,UserData});
   }catch(err){
     console.error(err);
-    await auditLogsM.logAction(req,'FAILED_USER_SIGNIN','User_',{ error:err.message||'Failed to sign in' ,email:req.body.email,status: 'Error'});
     return res.status(500).json({error:err.message||'Failed to sign in'});
   }
 }
@@ -141,43 +140,6 @@ async votingHistory(req, res) {
     return res.status(500).json({ error: err.message||"Failed to fetch voting history" });
   }
 }
-async adminSignin(req, res) {
-  const {email,password}=req.body;
-  try{
-    const result=await UserM.signinUser(email, password);
-
-    // Return Success but NO TOKEN yet
-    return res.json({ 
-      message: "Credentials verified. OTP sent to email.",
-      userId: result.id, // Frontend needs this ID to confirm the OTP
-      mfaRequired: true 
-    });
-
-  }catch(err){
-    console.error(err);
-    await auditLogsM.logAction(req,'FAILED_ADMIN_SIGNIN','SYSTEM',{ error:err.message||'Failed to sign in as admin' ,email:req.body.email,status: 'Error'});
-    return res.status(500).json({error:err.message||'Failed to sign in as admin'});
-}}
-adminVerifyMFA = async (req, res) => {
-  try {
-    const { userId, otp } = req.body;
-
-    // 1. Verify OTP against Redis Cache
-    await UserM.verifyOtp(userId, otp);
-
-    // 2. Fetch User details again (needed to ensure latest role/data is in JWT)
-    const user = (await pool.query(`SELECT id, name, email FROM users WHERE id=$1`, [userId])).rows[0];
-
-    // 3. Issue Token
-    const UserData = { id: user.id,name:user.name ,email: user.email };
-    const token = jwt.sign(UserData, SECRET_KEY, { expiresIn: '24h' });
-    return res.json({ message: "Login successful", token, UserData });
-  } catch (err) {
-    // Note: Errors here are typically 'Invalid OTP' or 'OTP expired'
-    await logAction(req, 'MFA_FAILED', `User_${req.body.userId}`, { error: err.message });
-    return res.status(401).json({ error: err.message });
-  }
-}
 async EditProfile(req, res){
   const userId=req.user.id;
   const {name,email,password}=req.body;
@@ -231,5 +193,6 @@ resendOtp = async (req, res) => {
     return res.status(429).json({ error: err.message });
   }
 }
+
 }
 export default new UserC()

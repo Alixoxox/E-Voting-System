@@ -43,15 +43,13 @@ class cityM{
             console.warn(`⚠️ Skipping invalid row:`, c);
             return null;
           }
-          const cityName = c.name.trim();
           const provinceName = c.province.trim().toLowerCase();
           const provinceId = provinceMap[provinceName];
-          
           if (!provinceId) {
-            console.warn(`⚠️ Province "${c.province}" not found in DB, skipping city "${cityName}"`);
+            console.warn(`⚠️ Province "${c.province}" not found in DB, skipping city "${c.name}"`);
             return null;
           }
-          
+          const cityName = c.name.trim().toLowerCase();
           return [cityName, provinceId];
         })
         .filter(Boolean); // Remove nulls
@@ -67,10 +65,13 @@ class cityM{
         values
       );
 
- await db.query(sql);
-      
+ const result=await db.query(sql);
+ await logAction(req, 'BULK_CITY_ADD', 'Bulk_Upload', { 
+  count: result.rowCount, 
+  status: 'Success' 
+});
     } catch (err) {
-      console.error('❌ Error inserting cities:', err);
+      console.error('Error inserting cities:', err);
       throw err;
     }
   }

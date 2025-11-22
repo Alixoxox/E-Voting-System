@@ -43,5 +43,15 @@ class audit_logsM{
           console.error("Logging failed:", err.message);
         }
       };
+    async getAuditLogs(page,limit, offset){
+        try{
+            const result=await pool.query(`SELECT * FROM audit_logs ORDER BY timestamp DESC LIMIT $1 OFFSET $2;`,[limit,offset]);
+            const total=await pool.query('SELECT COUNT(*) FROM audit_logs;');
+            return {page,result:result.rows,total:total.rows[0].count};
+        }catch(err){
+            console.error('Error fetching audit logs:', err);
+            throw new Error('Error fetching audit logs');
+        }
+    }
 }
 export default new audit_logsM();

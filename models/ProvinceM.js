@@ -28,7 +28,7 @@ class ProvinceM{
           const rows = [];
       
           for (const p of provinces) {
-            values.push(p.name);
+            values.push(p.name.trim().toLowerCase());
             rows.push(`($${values.length})`);
           }
       

@@ -43,7 +43,8 @@ class areaM {
             );
             return null; // skip cities with invalid province
           }
-          return [c.name, cityId];
+          const areaName = c.name.trim().toLowerCase();
+          return [areaName, cityId];
         })
         .filter(Boolean); // remove nulls
       if (!values.length) {
@@ -59,8 +60,11 @@ class areaM {
         `,
         values
       );
-
-        await db.query(sql);
+        const result=await db.query(sql);
+        await logAction(req, 'BULK_AREA_ADD', 'Bulk_Upload', { 
+          count: result.rowCount, 
+          status: 'Success' 
+      });
     } catch (err) {
       console.error("Error inserting cities:", err);
       throw err;

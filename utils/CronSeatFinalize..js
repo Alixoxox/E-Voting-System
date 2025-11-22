@@ -1,8 +1,8 @@
 import cron from "node-cron";
 import db from "../config/db.js";
 import auditLogsM from "../models/auditLogsM.js";
-
-cron.schedule("0 2 * * *", async () => {
+//every 2 days at midnight
+cron.schedule("0 0 */2 * *", async () => {
   console.log("🕐 Running auto seat chooser...");
 
   try {
