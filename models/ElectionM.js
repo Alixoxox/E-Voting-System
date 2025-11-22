@@ -1,4 +1,3 @@
-
 import db from '../config/db.js';
 
 class ElectionM{
@@ -7,7 +6,7 @@ class ElectionM{
             const sql=`
             CREATE TABLE IF NOT EXISTS Elections (
             id SERIAL PRIMARY KEY,
-            name VARCHAR(100) NOT NULL,
+            name VARCHAR(100) NOT NULL UNIQUE,
             seatType VARCHAR(20) CHECK (seatType IN ('National','Provincial')) DEFAULT 'Provincial',
             provinceId INTEGER REFERENCES province(id),
             startDate DATE DEFAULT CURRENT_DATE,
@@ -31,16 +30,41 @@ class ElectionM{
             throw new Error('Error fetching elections');
         }
     }
-    async createElection(name , startDate, endDate, seatType , Province){
-        try{
-            const provinceRow=await db.query(`SELECT id FROM province WHERE name=$1`, [Province]);
-            await db.query(`INSERT INTO elections (name, startDate, end_date, seatType, provinceId) VALUES ($1, $2, $3, $4, $5) ON CONFLICT DO NOTHING;`, [name, startDate, endDate, seatType, provinceRow.rows[0].id]);
+   // ElectionM.js
 
-    }catch(err){
-        console.error('Error creating election:', err);
-        throw new Error('Error creating election');
+async createElection(name, startDate, endDate, seatType, Province) {
+  try {
+    let provinceId = null;
+
+    // 1. If a Province is provided, look up its ID
+    if (Province) {
+      const provinceRow = await db.query(
+        `SELECT id FROM province WHERE LOWER(name) = LOWER($1)`, 
+        [Province.trim()]
+      );
+
+      if (provinceRow.rows.length === 0) {
+        throw new Error(`Province '${Province}' not found in database.`);
+      }
+      provinceId = provinceRow.rows[0].id;
     }
-    }
+
+    // 2. Insert Election (using RETURNING id so we can use it later if needed)
+    const result = await db.query(
+      `INSERT INTO elections (name, startDate, end_date, seatType, provinceId) 
+       VALUES ($1, $2, $3, $4, $5) 
+       ON CONFLICT DO NOTHING 
+       RETURNING id`, 
+      [name, startDate, endDate, seatType, provinceId]
+    );
+    
+    return result.rows[0]; // Return the new election object
+
+  } catch (err) {
+    console.error('Error creating election:', err);
+    throw err; // Throw the actual error message so the controller sees it
+  }
+}
     async getActiveElections(curentDate){
         try{
             const result= await db.query(`SELECT e.*, p.name as provinceName FROM elections e 

@@ -1,5 +1,6 @@
 import db from '../config/db.js';
 import format from 'pg-format';
+import auditLogsM from './auditLogsM.js';
 
 class cityM{
 
@@ -66,12 +67,8 @@ class cityM{
         values
       );
 
- const result=await db.query(sql);
- await client.query('COMMIT');
- await logAction(req, 'BULK_CITY_ADD', 'Bulk_Upload', { 
-  count: result.rowCount, 
-  status: 'Success' 
-});
+    await client.query(sql);
+    await client.query('COMMIT');
     } catch (err) {
       await client.query('ROLLBACK');
       console.error('Error inserting cities:', err);

@@ -38,17 +38,18 @@ class partyM{
           const rows = [];
       
           for (const p of parties) {
-            let hashed=await bcrypt.hash(p.password,10)
-            values.push(p.name, p.abbreviation, p.logo,p.email,hashed,"Approved");
-            rows.push(`($${values.length - 5},$${values.length - 4},$${values.length - 3}, $${values.length - 2}, $${values.length-1})`);
+            let hashed = await bcrypt.hash(p.password, 10);
+      
+            values.push(p.name, p.abbreviation, p.logo, p.email, hashed, "Approved");
+            const count = values.length;
+            rows.push(`($${count - 5}, $${count - 4}, $${count - 3}, $${count - 2}, $${count - 1}, $${count})`);
           }
       
           const sql = `
             INSERT INTO party (name, abbreviation, logo,email,password,approvalStatus)
-            VALUES ${rows.join(', ')}
-            ON CONFLICT (name,abbreviation) DO NOTHING;
+            VALUES ${rows.join(', ')};
           `;
-          await db.query(sql, values);
+          await client.query(sql, values);
           await client.query('COMMIT');
         } catch (err) {
           console.error('Error inserting parties:', err);
@@ -87,6 +88,7 @@ class partyM{
             if (party.approvalstatus === 'Rejected') {
               throw new Error('Your account has been rejected by the admin.');
             }
+            console.log('Comparing passwords:', password, party.password);
             let isMatch = await bcrypt.compare(password, party.password);
             if(!isMatch){
               throw new Error('Invalid password');

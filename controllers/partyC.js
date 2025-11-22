@@ -51,9 +51,12 @@ class Parties {
   };
   async createParty(req, res) {
     try {
-      const imageUrl = req.file.path; 
+      const imageUrl = req.file.path; // Cloudinary URL
+      const fileId = req.file.filename; // Cloudinary public_id
+      console.log("Uploaded file to Cloudinary:", imageUrl, fileId);
       const { name, abbreviation, email, password } = req.body;
-      let hashedpass=bcrypt.hash(password,10)
+      console.log(name, abbreviation, email, password);
+      let hashedpass=await bcrypt.hash(password,10)
       let result= await partyM.createParty(name, abbreviation, imageUrl,email,hashedpass);
       await userM.generateAndSendOtp(`party:${result.id}`, email, 'Party Account Verification');
       await auditLogsM.logAction(req, 'PARTY_REGISTERED', `Party_${result.id}`, { partyName: result.name, status: 'Pending Verification' });

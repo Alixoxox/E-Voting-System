@@ -170,7 +170,7 @@ router.post('/account/signin',UserC.signinUser);
  *       500:
  *         description: Failed to fetch candidates
  */
-router.post('/view/Candidates/:electionId',authenicator,UserC.viewCandidatesForUserElection);
+router.get('/view/Candidates/:electionId',authenicator,UserC.viewCandidatesForUserElection);
 
 /**
  * @swagger
@@ -229,7 +229,7 @@ router.post('/cast/vote',authenicator,UserC.castVote);
 
 /**
  * @swagger
- * /api/user/EditProfile:
+ * /api/users/EditProfile:
  *   post:
  *     summary: Edit user profile
  *     tags: [User]

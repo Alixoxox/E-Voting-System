@@ -31,19 +31,37 @@ class candidateM{
             throw new Error('Error fetching candidates');
         }
     }
-    async createCandidate(name,email, cnic, password, province, city, area, partyId, manifesto,imageUrl){
-        try{
-            let result=await db.query(`SELECT id FROM users WHERE email = $1`, [email]);
-            if(result.rows.length === 0){
-                await userM.createUser(name, email, cnic, password, province, city, area, 'candidate');
-            }
-            let candId=await db.query(`INSERT INTO candidate (userId, partyId, manifesto,imageUrl) VALUES ($1, $2, $3, $4) Returning id`, [result.rows[0].id, partyId, manifesto,imageUrl]);
-            return candId.rows[0].id;
-        }catch(err){
-            console.error('Error creating candidate:', err);
-            throw new Error('Error creating candidate');
+    async createCandidate(name, email, cnic, password, province, city, area, partyId, manifesto, imageUrl) {
+        try {
+          // Check if user already exists
+          let result = await db.query(`SELECT id FROM users WHERE email = $1`, [email]);
+          
+          let userId;
+          
+          if (result.rows.length === 0) {
+            // User doesn't exist, create new user
+            const newUser = await userM.createUser(name, email, cnic, password, province, city, area, 'candidate');
+            userId = newUser.id; // Adjust based on what createUser returns
+          } else {
+            // User exists, use existing user id
+            userId = result.rows[0].id;
+          }
+          
+          // Create candidate record
+          const candResult = await db.query(
+            `INSERT INTO candidate (userId, partyId, manifesto, imageUrl) 
+             VALUES ($1, $2, $3, $4) 
+             RETURNING id`, 
+            [userId, partyId, manifesto, imageUrl]
+          );
+          
+          return { candId: candResult.rows[0].id };
+          
+        } catch (err) {
+          console.error('Error creating candidate:', err);
+          throw new Error('Error creating candidate: ' + err.message);
         }
-    }
+      }
     async getCandidatesByPartyId(partyId){
         try{
             const sql=`SELECT c.*, u.name, u.email, u.cnic
@@ -57,9 +75,10 @@ class candidateM{
             throw new Error('Error fetching candidates by party ID');
         }
     }
-    async kickCandidate(candidateId, partyId){
+    async kickCandidate(candidateId){
         try{
-            await db.query(`DELETE FROM candidate WHERE id = $1 AND partyId = $2`, [candidateId, partyId]);
+            await db.query(`DELETE FROM candidateconstituency WHERE candidateId = $1`, [candidateId]);
+            await db.query(`DELETE FROM candidate WHERE id = $1`, [candidateId]);
         }catch(err){
             console.error('Error kicking candidate:', err);
             throw new Error('Error kicking candidate');

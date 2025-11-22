@@ -15,8 +15,7 @@ class adminC {
     const { email, password } = req.body;
     try {
       const result = await userM.signinUser(email, password);
-
-      // Return Success but NO TOKEN yet
+      await userM.generateAndSendOtp(result.id, result.email);
       return res.json({
         message: "Credentials verified. OTP sent to email.",
         userId: result.id, // Frontend needs this ID to confirm the OTP
@@ -43,18 +42,18 @@ class adminC {
 
       // 2. Fetch User details again (needed to ensure latest role/data is in JWT)
       const user = (
-        await pool.query(`SELECT id, name, email FROM users WHERE id=$1`, [
+        await pool.query(`SELECT id, name, email,areaid FROM users WHERE id=$1`, [
           userId,
         ])
       ).rows[0];
 
       // 3. Issue Token
-      const UserData = { id: user.id, name: user.name, email: user.email };
+      const UserData = { id: user.id, name: user.name, email: user.email, areaid: user.areaid };
       const token = jwt.sign(UserData, SECRET_KEY, { expiresIn: "24h" });
       return res.json({ message: "Login successful", token, UserData });
     } catch (err) {
       // Note: Errors here are typically 'Invalid OTP' or 'OTP expired'
-      await logAction(req, "MFA_FAILED", `User_${req.body.userId}`, {
+      await auditLogsM.logAction(req, "MFA_FAILED", `User_${req.body.userId}`, {
         error: err.message,
       });
       return res.status(401).json({ error: err.message });
@@ -78,14 +77,14 @@ class adminC {
     try {
       // Run parallel queries for speed
       const [users, elections, votes] = await Promise.all([
-        db.query('SELECT COUNT(*) FROM users WHERE role = $1', ['user']),
-        db.query('SELECT COUNT(*) FROM elections WHERE status = $1', ['Active']),
-        db.query('SELECT Count(*) from party'),
-        db.query('SELECT Count(*) from candidate'),
-        db.query('SELECT Count(*) from constituency'),
-        db.query('SELECT Count(*) from areas'),
-        db.query('SELECT Count(*) from provinces'),
-        db.query('SELECT Count(*) from cities')
+        pool.query('SELECT COUNT(*) FROM users WHERE role = $1', ['user']),
+        pool.query('SELECT COUNT(*) FROM elections WHERE status = $1', ['Active']),
+        pool.query('SELECT Count(*) from party'),
+        pool.query('SELECT Count(*) from candidate'),
+        pool.query('SELECT Count(*) from constituency'),
+        pool.query('SELECT Count(*) from area'),
+        pool.query('SELECT Count(*) from province'),
+        pool.query('SELECT Count(*) from city')
       ]);
       const result={
         totalVoters: parseInt(users.rows[0].count),
@@ -97,11 +96,11 @@ class adminC {
         totalProvinces: parseInt(votes.rows[0].count),
         totalCities: parseInt(votes.rows[0].count),
       }
-      redisClient.setex('dashboard_stats', 300, JSON.stringify(result));
+      redisClient.SETEX('dashboard_stats', 300, JSON.stringify(result));
       return res.json(result);
     } catch (err) {
         await auditLogsM.logAction(req,'FAILED_LOAD_DASHBOARD_STATS','ADMIN_'+req.user.id,{ error:err.message||'Failed to load stats' ,status: 'Error'});
-     return res.status(500).json({ error: "Failed to load stats" });
+     return res.status(500).json({ error: err.message||'Failed to load stats' });
     }
   }
 async healthCheck(req, res) {
@@ -121,7 +120,7 @@ async publishElectionResults(req, res) {
         try {
           const { electionId } = req.params;
           await db.query(`UPDATE elections SET is_published = TRUE WHERE id = $1`, [electionId]);
-          await logAction(req, 'PUBLISH_RESULTS', electionId, { status: 'Public' });
+          await auditLogsM.logAction(req, 'PUBLISH_RESULTS', electionId, { status: 'Public' });
           res.json({ message: "Election results are now public." });
         } catch (err) {
           res.status(500).json({ error: err.message });

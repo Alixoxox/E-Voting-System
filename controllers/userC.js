@@ -9,6 +9,7 @@ import votesM from '../models/votesM.js';
 import userM from '../models/userM.js';
 import auditLogsM from '../models/auditLogsM.js';
 import pool from '../config/db.js';
+import { sendVoteReceipt } from '../utils/emailservice.js';
 dotenv.config(); // loads variables from .env into process.env
 
 const SECRET_KEY = process.env.SECRET_KEY;
@@ -46,9 +47,9 @@ signinUser = async (req, res) => {
     const result=await UserM.signinUser(email, password);
     console.log(result)
     if(!result.is_verified){
-      return res.status(403).json({error:'Please verify your email before signing in.',userId: result.id});
+      return res.status(403).json({error:'Please verify your email before signing in.',userId: result.id, areaid: result.areaid});
     }
-    const UserData={id:result.id,name:result.name,email:result.email};
+    const UserData={id:result.id,name:result.name,email:result.email,areaid:result.areaid};
     const token=jwt.sign(UserData, SECRET_KEY, {expiresIn:'24h'})
     return res.json({message:'User signed successfully',token,UserData});
   }catch(err){
@@ -73,6 +74,8 @@ verifyAccount = async (req, res) => {
 async viewCandidatesForUserElection(req,res){
   try{
     const areaId=req.user.areaid;
+    console.log('User Area ID:', areaId);
+    if(!areaId){ throw new Error('Sorry You Are Not Eligible');}
     const {electionId}=req.params;
     if(redisClient.exists(`viewCandidatesForUserElection:${areaId}:${electionId}`)){
       let cachedCandidates=await redisClient.get(`viewCandidatesForUserElection:${areaId}:${electionId}`);
@@ -141,7 +144,7 @@ async castVote(req, res) {
   } catch (err) {
     console.error("Error Casting Vote:", err);
     // Log Failure
-    await logAction(req, 'FAILED_CAST_VOTE', `User_${userId}`, { error: err.message });
+    await auditLogsM.logAction(req, 'FAILED_CAST_VOTE', `User_${userId}`, { error: err.message });
     res.status(500).json({ error: err.message || "Error casting vote" });
   }
 }
@@ -152,7 +155,7 @@ async votingHistory(req, res) {
   const limit = req.query.limit || 10;
   const page= req.query.page || 1;
   try {
-    votingHistory = await votesM.votingHistory(userId,limit,page);
+    let votingHistory = await votesM.votingHistory(userId,limit,page);
     return res.json(votingHistory);
   } catch (err) {
     console.error("Error fetching voting history:", err);

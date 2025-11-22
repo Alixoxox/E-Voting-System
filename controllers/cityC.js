@@ -23,8 +23,7 @@ AddCitycsv = async (req, res) => {
     const required = ['name', 'province'];
     const data = await parseCsvWithValidation(req.file.path, required);
     // now insert to db
-    await cityM.AddCitycsv(data)
-    await auditLogsM.logAction(req,'CITY_CSV_UPLOAD','CITY_CSV_UPLOAD',{rowsAdded:data.length,status: 'Success'});
+    const res=await cityM.AddCitycsv(data)
     return res.json({ message: 'Cities added successfully' });
   }catch(err){
     console.error(err);

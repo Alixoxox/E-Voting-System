@@ -3,6 +3,7 @@ import bcrypt from 'bcrypt';
 import { redisClient } from "../server.js";
 import crypto from 'crypto';
 import { sendOTP } from "../utils/emailservice.js";
+import auditLogsM from "./auditLogsM.js";
 class UserM {
   async createTable() {
     try {
@@ -47,32 +48,57 @@ class UserM {
       throw new Error('Error fetching users');
     }
   }
-  async createUser(name, email, cnic, password, province, city, area,role) {
-  try{
-    let result = await pool.query(`
-      SELECT p.id AS province_id, c.id AS city_id, a.id AS area_id
-      FROM province p
-      JOIN city c ON c.provinceid = p.id
-      JOIN area a ON a.cityid = c.id
-      WHERE p.name = $1 AND c.name = $2 AND a.name = $3
-    `, [province, city, area]); 
-    if(result.rows.length === 0){
-      throw new Error('Invalid province, city, or area name');
+  // userM.js
+  async createUser(name, email, cnic, password, province, city, area, role) {
+    try {
+      // 1. Initialize IDs
+      let province_id = null, city_id = null, area_id = null;
+  
+      // 2. Robust Location Lookup (Case-Insensitive & Trimmed)
+      const locationRes = await pool.query(`
+        SELECT p.id AS province_id, c.id AS city_id, a.id AS area_id
+        FROM province p
+        JOIN city c ON c.provinceid = p.id
+        JOIN area a ON a.cityid = c.id
+        WHERE LOWER(p.name) = LOWER($1) 
+          AND LOWER(c.name) = LOWER($2) 
+          AND LOWER(a.name) = LOWER($3)
+      `, [province.trim(), city.trim(), area.trim()]); 
+  
+      // 3. Strict Check Logic
+      if (locationRes.rows.length > 0) {
+        // Found it!
+        province_id = locationRes.rows[0].province_id;
+        city_id = locationRes.rows[0].city_id;
+        area_id = locationRes.rows[0].area_id;
+      } 
+      else {
+        // Not Found
+        if (role === 'admin') {
+          console.log(`⚠️ System Notice: Creating Admin '${email}' without linked location.`);
+        } else {
+          // Throw explicit error showing exactly what failed
+          throw new Error(`Invalid location details. The area '${area}' in city '${city}' (${province}) does not exist in our database.`);
+        }
+      }
+  
+      // ... (Rest of your insert logic remains the same) ...
+      let isVerified = (role === 'admin' || role === 'candidate');
+  
+      const result = await pool.query(
+        `INSERT INTO users (name, email, cnic, password, provinceId, cityId, areaId, role, is_verified) 
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9) 
+         RETURNING *`, 
+        [name, email, cnic, password, province_id, city_id, area_id, role, isVerified]
+      );
+  
+      return result.rows[0];
+  
+    } catch (err) {
+      if (err.code === '23505') throw new Error('Email or CNIC already exists');
+      throw err;
     }
-    const { province_id, city_id, area_id } = result.rows[0];
-    let is_verified=false;
-    if(role==='admin'||role==='candidate'){
-    is_verified=true;
-    }
-    result=await pool.query(`INSERT INTO users (name, email, cnic, password, provinceId, cityId, areaId, role, is_verified) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9) Returning *`, [name, email, cnic, password, province_id, city_id, area_id,role,is_verified ]);
-    return result.rows[0];
-  }catch(err){
-    if (err.code === '23505') {
-      throw new Error('Email or Cnic already exists');
-    }
-    throw new Error(err.message || 'Error creating user');
   }
-}
 async signinUser(email, password){
   const ATTEMPTS_KEY = `login:attempts:${email}`;
   const LOCK_KEY = `login:locked:${email}`;
@@ -89,7 +115,7 @@ async signinUser(email, password){
     }
 
     // 2. Find User (Main DB)
-    const res = await pool.query(`SELECT id, name, email, password,is_verified FROM users WHERE email = $1`, [email]);
+    const res = await pool.query(`SELECT id, name, email, password,is_verified,areaid FROM users WHERE email = $1`, [email]);
     if (res.rows.length === 0) throw new Error('User not found');
     const user = res.rows[0];
     const isMatch = await bcrypt.compare(password, user.password);

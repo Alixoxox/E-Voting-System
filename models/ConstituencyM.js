@@ -33,56 +33,77 @@ class ConstituencyM{
         const client = await db.connect();
         try {
             await client.query('BEGIN');
+    
+            // 1️⃣ Prepare Constituency Data
             const constituencyValues = data.map(item => [
                 item.code,
                 item.name,
-                item.seatType.toLowerCase() === 'national' ? 'National' : 'Provincial',
+                item.seatType.trim().toLowerCase() === 'national' ? 'National' : 'Provincial',
                 'Active'
             ]);
     
-            await db.query(format(`
+            // 2️⃣ Bulk Insert Constituencies
+            await client.query(format(`
                 INSERT INTO constituency (code, name, seatType, status)
                 VALUES %L
-                ON CONFLICT DO NOTHING;
+                ON CONFLICT (code) DO NOTHING; -- Changed to (code) to be safe
             `, constituencyValues));
     
-            // 2️⃣ Fetch all constituency IDs
-            const resCon = await db.query(`SELECT id, code FROM constituency`);
-            const codeToId = Object.fromEntries(resCon.rows.map(r => [r.code, r.id]));
+            // 3️⃣ Re-fetch IDs to handle existing + new ones
+            const resCon = await client.query(`SELECT id, code FROM constituency`);
+            const codeToId = {}; 
+            resCon.rows.forEach(r => { codeToId[r.code] = r.id; });
     
-            // 3️⃣ Fetch all area IDs once
-            const resArea = await db.query(`SELECT id, name FROM area`);
-            const areaNameToId = Object.fromEntries(resArea.rows.map(r => [r.name, r.id]));
-    
-            // 4️⃣ Build junctionValues in one go without nested loops
-            const junctionValues = [];
-            data.forEach(item => {
-                const constituencyId = codeToId[item.code];
-                item.areas.split(',').forEach(areaName => {
-                    const areaId = areaNameToId[areaName.trim()];
-                    if (areaId) junctionValues.push([constituencyId, areaId]);
-                });
+            // 4️⃣ Fetch Areas & Normalize to Lowercase (CRITICAL FIX)
+            const resArea = await client.query(`SELECT id, name FROM area`);
+            const areaNameToId = {};
+            resArea.rows.forEach(r => {
+                areaNameToId[r.name.trim().toLowerCase()] = r.id;
             });
     
-            // 5️⃣ Bulk insert into junction table in a single query
-            if (junctionValues.length) {
-                await db.query(format(`
+            // 5️⃣ Build Junctions
+            const junctionValues = [];
+            
+            data.forEach(item => {
+                const constituencyId = codeToId[item.code];
+                
+                if (constituencyId && item.areas) {
+                    // Split by comma
+                    const areaList = item.areas.split(',');
+    
+                    areaList.forEach(areaRaw => {
+                        // Normalize CSV input to lowercase to match map
+                        const areaClean = areaRaw.trim().toLowerCase();
+                        const areaId = areaNameToId[areaClean];
+    
+                        if (areaId) {
+                            junctionValues.push([constituencyId, areaId]);
+                        } else {
+                            console.log(`Skipped Area: "${areaRaw}" not found in DB.`);
+                        }
+                    });
+                }
+            });
+    
+            // 6️⃣ Bulk Insert Junctions
+            if (junctionValues.length > 0) {
+                await client.query(format(`
                     INSERT INTO constituency_area (constituencyid, areaid)
                     VALUES %L
-                    ON CONFLICT DO NOTHING;
+                    ON CONFLICT (constituencyid, areaid) DO NOTHING;
                 `, junctionValues));
             }
+    
             await client.query('COMMIT');
-            console.log('Constituencies and area links inserted successfully ');
+            console.log('✅ Constituencies and area links inserted successfully');
     
         } catch (err) {
             await client.query('ROLLBACK');
-            console.error('Error inserting constituencies in bulk:', err);
+            console.error('Error inserting constituencies:', err);
             throw err;
-        }finally{
+        } finally {
             client.release();
         }
-    
 }
 async getAreaByConstituency(constituencyid){
     try{

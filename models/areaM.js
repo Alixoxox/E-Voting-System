@@ -1,5 +1,6 @@
 import db from "../config/db.js";
 import format from 'pg-format';
+import auditLogsM from "./auditLogsM.js";
 class areaM {
   async createTable() {
     try {
@@ -27,7 +28,7 @@ class areaM {
   }
 
   async AddAreasCsv(cities) {
-    const client = await pool.connect();
+    const client = await db.connect();
     try {
       await client.query('BEGIN');
       const { rows: City } = await db.query("SELECT id, name FROM city");
@@ -61,12 +62,9 @@ class areaM {
         `,
         values
       );
-        const result=await client.query(sql);
-        await pool.query('COMMIT');
-        await logAction(req, 'BULK_AREA_ADD', 'Bulk_Upload', { 
-          count: result.rowCount, 
-          status: 'Success' 
-      });
+        await client.query(sql);
+        await client.query('COMMIT');
+        
     } catch (err) {
       await client.query('ROLLBACK');
       console.error("Error inserting cities:", err);

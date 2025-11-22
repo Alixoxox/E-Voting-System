@@ -3,10 +3,9 @@ import Parties from '../controllers/partyC.js';
 import CandidateC from '../controllers/candidateC.js';
 import candidateConstituencyC from '../controllers/candConstC.js';
 
-import multer from 'multer';
 import { authenicator } from '../middleware/authenicator.js';
 const router = express.Router();
-const upload = multer({ dest: 'uploads/' }); // temporary storage
+import { upload } from '../utils/imgUloader.js'; // or wherever your file is
 
 /**
  * @swagger
@@ -89,42 +88,48 @@ router.get('/candidates', authenicator,CandidateC.getCandidatesByPartyId);
  *     tags: [Parties]
  *     security:
  *       - bearerAuth: []
- *     consumes:
- *       - multipart/form-data
  *     requestBody:
  *       required: true
  *       content:
  *         multipart/form-data:
  *           schema:
  *             type: object
+ *             required:
+ *               - UserData
+ *               - Candidate
  *             properties:
  *               UserData:
- *                 type: object
- *                 properties:
- *                   name: { type: string }
- *                   email: { type: string }
- *                   cnic: { type: string }
- *                   password: { type: string }
- *                   province: { type: string }
- *                   city: { type: string }
- *                   area: { type: string }
+ *                 type: string
+ *                 description: JSON string containing user data
+ *                 example: '{"name":"John Doe","email":"john@example.com","cnic":"12345-1234567-1","password":"password123","province":"Sindh","city":"Karachi","area":"Clifton"}'
  *               Candidate:
- *                 type: object
- *                 properties:
- *                   partyId: { type: integer }
- *                   manifesto: { type: string }
+ *                 type: string
+ *                 description: JSON string containing candidate data
+ *                 example: '{"partyId":1,"manifesto":"My campaign promises..."}'
  *               image:
  *                 type: string
  *                 format: binary
+ *                 description: Optional candidate profile image
  *     responses:
  *       200:
  *         description: Candidate created successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 message:
+ *                   type: string
+ *                 candidateId:
+ *                   type: integer
+ *                 imageUploaded:
+ *                   type: boolean
  *       400:
  *         description: Invalid input data
  *       500:
  *         description: Server error
  */
-router.post('/create/candidate',authenicator,upload.single('image'), CandidateC.CreateCandidate);
+router.post('/create/candidate', authenicator, upload.single('image'), CandidateC.CreateCandidate);
 /**
  * @swagger
  * /api/parties/kick/candidate/{candidateId}:
@@ -177,8 +182,10 @@ router.delete('/kick/candidate/:candidateId',authenicator ,CandidateC.kickCandid
  *                 type: string
  *               email:
  *                 type: string
+ *                 format: email
  *               password:
  *                 type: string
+ *                 format: password
  *               image:
  *                 type: string
  *                 format: binary

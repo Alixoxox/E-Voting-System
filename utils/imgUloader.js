@@ -1,5 +1,6 @@
 import { v2 as cloudinary } from 'cloudinary';
-import { CloudinaryStorage } from 'multer-storage-cloudinary';
+import pkg from 'multer-storage-cloudinary';
+const { CloudinaryStorage } = pkg;
 import multer from 'multer';
 
 cloudinary.config({
@@ -9,12 +10,11 @@ cloudinary.config({
 });
 
 const storage = new CloudinaryStorage({
-  cloudinary,
+  cloudinary: cloudinary,
   params: {
     folder: 'user_uploads',
-    allowed_formats: ['jpg', 'png'],
-    transformation: [{ width: 500, height: 500, crop: 'limit' }]
+    allowed_formats: ['jpg', 'png', 'jpeg'],
   }
 });
 
-export const upload = multer({ storage });
+export const upload = multer({ storage: storage });

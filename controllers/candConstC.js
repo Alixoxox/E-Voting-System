@@ -47,7 +47,8 @@ ChooseSeat =async(req, res)=>{
 
 GetwonSeats=async(req, res)=>{
 try{
-  const candidateId = req.params; // candidate must be logged in
+  const candidateId = Number(req.params.candidateId);
+  console.log(candidateId);
   if(await redisClient.exists(`GetwonSeats:${candidateId}`)){
     let cachedResults=await redisClient.get(`GetwonSeats:${candidateId}`)
     return res.json(JSON.parse(cachedResults));

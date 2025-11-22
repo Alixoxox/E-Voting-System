@@ -28,19 +28,17 @@ class ProvinceM{
           await client.query('BEGIN');
           const values = [];
           const rows = [];
-      
           for (const p of provinces) {
             values.push(p.name.trim().toLowerCase());
             rows.push(`($${values.length})`);
           }
-      
           const sql = `
             INSERT INTO province (name)
             VALUES ${rows.join(', ')}
             ON CONFLICT (name) DO NOTHING;
           `;
       
-          await db.query(sql, values);
+          await client.query(sql, values);
           await client.query('COMMIT');
         } catch (err) {
           console.error('Error inserting provinces:', err);

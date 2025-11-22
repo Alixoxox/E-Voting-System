@@ -19,19 +19,45 @@ getElections = async (req, res) => {
   }
 }
 CreateEllection = async (req, res) => { 
-  try{
-    const {name , startDate, endDate, seatType , Province} = req.body;
-    if(seatType.tolowerCase()=="national"){
-      Province=null;
+  try {
+    let { name, startDate, endDate, seatType, Province } = req.body;
+
+    // 1. Normalize Input (Handle 'national', 'National', 'NATIONAL')
+    const lowerType = seatType.trim().toLowerCase();
+    
+    // 2. Determine Correct Database Value & Logic
+    let dbSeatType = 'Provincial'; // Default
+
+    if (lowerType === "national") {
+      dbSeatType = "National"; // ⚠️ Must match DB Constraint 'National'
+      Province = null;         // National elections have no specific province
+    } else {
+      dbSeatType = "Provincial"; // ⚠️ Must match DB Constraint 'Provincial'
+      
+      if (!Province) {
+        return res.status(400).json({ error: "Province is required for Provincial elections." });
+      }
     }
-    await ElectionM.createElection(name , startDate, endDate, seatType , Province);
-    await auditLogsM.logAction(req,'CREATE_ELECTION' ,'User_'+req.user.id,{ msg:'Created election '+name ,email:req.user.email,status: 'Success'});
-    return  res.json({message:'Election created successfully'});
-  }catch(Err){
-    console.log(Err)
-    await auditLogsM.logAction(req,'FAILED_CREATE_ELECTION' ,'User_'+req.user.id,{ error:Err.message||'Failed to create election' ,email:req.user.email,status: 'Error'});
-    return res.status(500).json({error:Err.message||'Failed to create election'})
-  }}
+
+    // 3. Call Model with the CORRECT Case (dbSeatType)
+    await ElectionM.createElection(name, startDate, endDate, dbSeatType, Province);
+
+    // 4. Log Success
+    await auditLogsM.logAction(
+      req, 
+      'CREATE_ELECTION', 
+      'New_Election', 
+      { name, seatType: dbSeatType, province: Province, status: 'Success' }
+    );
+
+    return res.json({ message: 'Election created successfully' });
+
+  } catch (Err) {
+    console.error(Err);
+    await auditLogsM.logAction(req, 'FAILED_CREATE_ELECTION', 'SYSTEM', { error: Err.message, status: 'Error' });
+    return res.status(500).json({ error: Err.message });
+  }
+}
  getActiveElections=async(req, res)=>{
   try{
     let curentDate=new Date().toISOString().split('T')[0];
@@ -48,12 +74,13 @@ CreateEllection = async (req, res) => {
     res.status(500).json({ error: err.message||'Failed to fetch active elections' });
   }}
 
-  async verifyElectionIntegrity(req,rea){
+  async verifyElectionIntegrity(req,res){
     try{
       const {electionId}=req.params;
+      console.log(electionId);
       const result=await votesM.verifyElectionIntegrity(electionId);
       await auditLogsM.logAction(req,'VERIFY_ELECTION_INTEGRITY' ,'Votes_'+req.user.id,{ electionId: electionId, msg: "Election integrity verified successfully" ,status: 'Success'});
-      return res.json({message:'Election integrity verified successfully',result});
+      return res.json(result);
     }catch(err){
       console.error(err);
       await auditLogsM.logAction(req,'FAILED_VERIFY_ELECTION_INTEGRITY' ,'Votes_',{ error:err.message||'Failed to verify election integrity' ,email:req.user.email,status: 'Error'});
@@ -64,6 +91,9 @@ CreateEllection = async (req, res) => {
 getPastResults = async (req, res) => {
   try {
     const results = await ElectionM.getPastElectionResults();
+    if(results.length===0){
+      return res.status(404).json({ error: 'No past election results found' });
+    }
     res.json(results);
   } catch (err) {
     res.status(500).json({ error: err.message });

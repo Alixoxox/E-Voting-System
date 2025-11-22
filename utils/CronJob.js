@@ -1,6 +1,6 @@
 import cron from 'node-cron';
 import db from '../config/db.js';
-import { logAction } from '../utils/auditLogger.js'; // Ensure named import if exported that way
+import auditLogsM from '../models/auditLogsM.js';
 
 // Everyday at midnight
 cron.schedule('0 0 * * *', async () => {
@@ -47,7 +47,7 @@ cron.schedule('0 0 * * *', async () => {
         UPDATE elections SET status = 'Ended' WHERE id = $1
       `, [electionId]);
 
-      await logAction(null, 'ELECTION_RESULTS_DECLARED', `Election_${electionId}`, { 
+      await auditLogsM.logAction(null, 'ELECTION_RESULTS_DECLARED', `Election_${electionId}`, { 
           status: 'Success', 
           winnersCount: topWinners.size 
       });
@@ -55,7 +55,7 @@ cron.schedule('0 0 * * *', async () => {
       console.log(`✅ Declared results for election ${electionId}`);
     }
   } catch (err) {
-    await logAction(null, 'DAILY_RESULT_CHECK_FAILED', 'SYSTEM', { error: err.message,status: 'Error', });
+    await auditLogsM.logAction(null, 'DAILY_RESULT_CHECK_FAILED', 'SYSTEM', { error: err.message,status: 'Error', });
     console.error(' Error running daily election result check:', err);
   }
 });

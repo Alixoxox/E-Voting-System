@@ -1,4 +1,5 @@
 import pool from "../config/db.js"
+import auditLogsM from "./auditLogsM.js";
 
 class votesM {
 
@@ -113,17 +114,15 @@ class votesM {
     }
 
     // Verify Votes
-  verifyElectionIntegrity = async (req, res) => {
+  async verifyElectionIntegrity (electionId) {
   try {
-    const { electionId } = req.params;
-
     // 1. Get all votes for this election, ordered by ID
-    const { rows: votes } = await db.query(
+    const { rows: votes } = await pool.query(
       `SELECT id, previous_hash, current_hash FROM votes WHERE electionId = $1 ORDER BY id ASC`,
       [electionId]
     );
 
-    if (votes.length === 0) return res.json({ status: "Clean", message: "No votes cast yet." });
+    if (votes.length === 0) return { status: "Clean", message: "No votes cast yet." };
 
     const brokenLinks = [];
 
@@ -145,7 +144,7 @@ class votesM {
     // 4. Report Results
     if (brokenLinks.length > 0) {
       // Log this serious security event!
-      await logAction(req, 'INTEGRITY_CHECK_FAILED', electionId, { errors: brokenLinks });
+      await auditLogsM.logAction(req, 'INTEGRITY_CHECK_FAILED', electionId, { errors: brokenLinks });
       
       return {
         status: "Compromised",
@@ -154,10 +153,10 @@ class votesM {
       };
     }
 
-    return { status: "Secure", message: "  Verification Passed. All hashes match." };
+    return { status: "Secure", message: "Verification Passed. All hashes match." };
 
   } catch (err) {
-    return { error: err.message };
+    throw new Error('Error verifying election integrity: ' + err.message);
   }
 }
 }

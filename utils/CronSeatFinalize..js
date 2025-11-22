@@ -1,6 +1,6 @@
 import cron from "node-cron";
 import db from "../config/db.js";
-import { logAction } from "../utils/auditLogger.js";
+import auditLogsM from "../models/auditLogsM.js";
 
 // Every 2 days at midnight
 cron.schedule("0 0 */2 * *", async () => {
@@ -45,7 +45,7 @@ cron.schedule("0 0 */2 * *", async () => {
 
         // ⚠️ ADDED LOG: Log exactly what was deleted (Critical for Audit)
         if(deleted.length > 0) {
-             await logAction(null, 'SYSTEM_AUTO_DROP_SEAT', `Candidate_${candidateid}`, {
+             await auditLogsM.logAction(null, 'SYSTEM_AUTO_DROP_SEAT', `Candidate_${candidateid}`, {
                 electionId,
                 keptSeat: chosenSeatId,
                 droppedConstituencies: deleted.map(d => d.constituencyid)
@@ -68,7 +68,7 @@ cron.schedule("0 0 */2 * *", async () => {
             `, [runnerUp[0].id]);
             
             // Log promotion
-            await logAction(null, 'SYSTEM_PROMOTE_RUNNERUP', `Seat_${runnerUp[0].id}`, {
+            await auditLogsM.logAction(null, 'SYSTEM_PROMOTE_RUNNERUP', `Seat_${runnerUp[0].id}`, {
                 originalWinner: candidateid
             });
           }
@@ -80,11 +80,11 @@ cron.schedule("0 0 */2 * *", async () => {
       `, [electionId]);
 
       // ⚠️ FIX: Correct arguments
-      await logAction(null, 'AUTO_SEAT_ASSIGNMENT_COMPLETED', `Election_${electionId}`, { status: 'Success' });
+      await auditLogsM.logAction(null, 'AUTO_SEAT_ASSIGNMENT_COMPLETED', `Election_${electionId}`, { status: 'Success' });
       console.log(`✅ Auto seat assignment completed for election ${electionId}`);
     }
   } catch (err) {
-    await logAction(null, 'AUTO_SEAT_ASSIGNMENT_FAILED', 'SYSTEM', { error: err.message });
+    await auditLogsM.logAction(null, 'AUTO_SEAT_ASSIGNMENT_FAILED', 'SYSTEM', { error: err.message });
     console.error("❌ Error in auto seat chooser:", err);
   }
 });
