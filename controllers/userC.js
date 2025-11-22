@@ -178,30 +178,56 @@ async EditProfile(req, res){
 
 async forgotPasswordRequest(req, res) {
   try {
-    const { email, cnic } = req.body;
-    // Find User
-    const resDb = await pool.query("SELECT id FROM users WHERE email=$1 AND cnic=$2", [email, cnic]);
+    const { email, cnic, type } = req.body; // type = 'user' (default) or 'party'
+    const isParty = type === 'party';
     
-    if (!resDb || resDb.rows.length === 0) throw new Error("User not found");
-    
-    const userId = resDb.rows[0].id;
-    await UserM.generateAndSendOtp(userId, email, 'Password Reset OTP');
-    
-    return res.json({ message: "OTP sent to email", userId });
+    let entityId;
+    if (isParty) {//party only email
+      const resDb = await pool.query("SELECT id FROM party WHERE email=$1", [email]);
+      if (resDb.rows.length === 0) throw new Error("Party not found");
+      entityId = resDb.rows[0].id;
+    } else {
+      //User Logic (Check Email + CNIC) ---
+      const resDb = await pool.query("SELECT id FROM users WHERE email=$1 AND cnic=$2", [email, cnic]);
+      if (resDb.rows.length === 0) throw new Error("User not found");
+      entityId = resDb.rows[0].id;
+    }
+    // We prefix the ID (e.g. "party:5" or "user:5") to distinguish in Redis
+    const redisKey = isParty ? `party:${entityId}` : `user:${entityId}`;
+    await UserM.generateAndSendOtp(redisKey, email, 'Password Reset OTP');
+    return res.json({ message: "OTP sent to email", id: entityId, type: isParty ? 'party' : 'user' });
   } catch (err) {
-    await auditLogsM.logAction(req,'FAILED_PASSWORD_RESET_REQUEST','User_'+(req.body.userId||'UNKNOWN'),{ error:err.message||'Failed to request password reset' ,email:req.body.email,status: 'Error'});
+    await auditLogsM.logAction(req, 'FAILED_PASSWORD_RESET_REQUEST', req.body.email || 'UNKNOWN', { error: err.message, status: 'Error' });
     return res.status(400).json({ error: err.message });
   }
 }
 async resetPasswordWithOtp(req, res) {
   try {
-    const { userId, otp, newPassword } = req.body;
-    await UserM.verifyOtp(userId, otp);
+    const { userId, otp, newPassword, type } = req.body; // type is required
+    const isParty = type === 'party';
+    
+    // 1. Define Table & Prefix based on type
+    const table = isParty ? 'party' : 'users';
+    const redisKey = isParty ? `party:${userId}` : `user:${userId}`;
+
+    // 2. Verify OTP (Using the prefixed key)
+    await UserM.verifyOtp(redisKey, otp);
+
+    // 3. Update Password
     const hashedPassword = await bcrypt.hash(newPassword, 10);
-    await pool.query("UPDATE users SET password = $1 WHERE id = $2", [hashedPassword, userId]);
+    await pool.query(`UPDATE ${table} SET password = $1 WHERE id = $2`, [hashedPassword, userId]);
+
+    // 4. Unlock Account (Clear Redis Login Attempts)
+    const userRes = await pool.query(`SELECT email FROM ${table} WHERE id = $1`, [userId]);
+    
+    if (userRes.rows.length > 0) {
+      const email = userRes.rows[0].email;
+      await redisClient.del(`login:attempts:${email}`);
+      await redisClient.del(`login:locked:${email}`);
+    }
     return res.json({ message: "Password reset successfully" });
   } catch (err) {
-    await auditLogsM.logAction(req,'FAILED_PASSWORD_RESET','User_'+req.body.userId,{ error:err.message||'Failed to reset password' ,status: 'Error'});
+    await auditLogsM.logAction(req, 'FAILED_PASSWORD_RESET', `${req.body.type}_${req.body.userId}`,{ error: err.message, status: 'Error' });
     return res.status(400).json({ error: err.message });
   }
 }

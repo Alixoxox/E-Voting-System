@@ -124,7 +124,7 @@ router.get('/candidates', authenicator,CandidateC.getCandidatesByPartyId);
  *       500:
  *         description: Server error
  */
-router.post('/create/candidate',upload.single('image'),authenicator, CandidateC.CreateCandidate);
+router.post('/create/candidate',authenicator,upload.single('image'), CandidateC.CreateCandidate);
 /**
  * @swagger
  * /api/parties/kick/candidate/{candidateId}:

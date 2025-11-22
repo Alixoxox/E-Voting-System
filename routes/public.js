@@ -109,12 +109,14 @@ router.get('/cities', cityC.getCities);
  *         application/json:
  *           schema:
  *             type: object
- *             required: [email, cnic]
+ *             required: [email, cnic,type]
  *             properties:
  *               email:
  *                 type: string
  *                 format: email
  *               cnic:
+ *                 type: string
+ *               type:
  *                 type: string
  *     responses:
  *       200:
@@ -135,7 +137,7 @@ router.post('/password/forgot', userC.forgotPasswordRequest);
  *         application/json:
  *           schema:
  *             type: object
- *             required: [userId, otp, newPassword]
+ *             required: [userId, otp, newPassword,type]
  *             properties:
  *               userId:
  *                 type: integer
@@ -144,6 +146,10 @@ router.post('/password/forgot', userC.forgotPasswordRequest);
  *               newPassword:
  *                 type: string
  *                 format: password
+ *               type:
+ *                  type: string
+ *                  enum: ["party", "user"]
+ *                  example: "party"
  *     responses:
  *       200:
  *         description: Password updated successfully

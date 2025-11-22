@@ -36,7 +36,7 @@ const upload = multer({ dest: 'uploads/' }); // temporary storage
  *       200: { description: Users retrieved successfully }
  *       500: { description: Server error }
  */
-router.get('/fetch/users', userC.fetchUsers);
+router.get('/fetch/users', authenicator,userC.fetchUsers);
 
 /**
  * @swagger
@@ -434,7 +434,7 @@ router.get('/verify/integrity/:electionId', authenicator, ElectionC.verifyElecti
  *       500:
  *         description: Server error
  */
-router.get('/view/auditLogs',adminC.FetchAuditLogs);
+router.get('/view/auditLogs',authenicator,adminC.FetchAuditLogs);
 /**
  * @swagger
  * /api/admin/dashboard/stats:
@@ -470,7 +470,7 @@ router.get('/dashboard/stats', authenicator, adminC.getDashboardStats);
  *       500:
  *         description: Server error
  */
-router.get('/parties/candidates/aggregated', adminC.fetchPartiesWithCandidates);
+router.get('/parties/candidates/aggregated', authenicator,adminC.fetchPartiesWithCandidates);
 /**
  * @swagger
  * /api/admin/reject/PartyRegistration/{partyId}:
@@ -488,6 +488,6 @@ router.get('/parties/candidates/aggregated', adminC.fetchPartiesWithCandidates);
  *       400: { description: Bad request }
  *       500: { description: Server error }
  */
-router.post('/reject/PartyRegistration/:partyId', partyC.RejectPartyRegistration)
+router.post('/reject/PartyRegistration/:partyId',authenicator ,partyC.RejectPartyRegistration)
 
 export default router;
