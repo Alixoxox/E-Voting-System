@@ -280,4 +280,35 @@ router.get('/area/constituency/:constituencyid', ConstituencyC.getAreaByConstitu
  */
 router.get('/active/Elections', ElectionC.getActiveElections);
 
+/**
+ * @swagger
+ * /api/public/resend/otp:
+ *   post:
+ *     summary: Resend Verification/MFA OTP
+ *     description: Sends a new OTP to the user's email with cooldown and rate limit protection [For both user and admin].
+ *     tags: [Public]
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [userId, email]
+ *             properties:
+ *               userId:
+ *                 type: integer
+ *                 example: 55
+ *               email:
+ *                 type: string
+ *                 format: email
+ *                 example: "user@example.com"
+ *     responses:
+ *       200:
+ *         description: OTP resent successfully.
+ *       429:
+ *         description: Too many requests – cooldown/rate limit triggered.
+ *       500:
+ *         description: Failed to send email.
+ */
+router.post('/resend/otp', userC.resendOtp);
 export default router;

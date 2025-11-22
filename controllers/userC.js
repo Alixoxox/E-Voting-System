@@ -187,6 +187,7 @@ async EditProfile(req, res){
       return res.status(400).json({ error: "Please provide name, email, or password to update." });
     }
     await userM.EditProfile(userId,name,email,password);
+    return res.json({message:'Profile updated successfully'});
   }catch(err){
     console.error(err);
     await auditLogsM.logAction(req,'FAILED_PROFILE_EDIT','User_'+userId,{ error:err.message||'Failed to edit profile' ,email:req.user.email,status: 'Error'});
@@ -220,6 +221,15 @@ async resetPasswordWithOtp(req, res) {
     return res.status(400).json({ error: err.message });
   }
 }
-
+resendOtp = async (req, res) => {
+  try {
+    const { userId, email } = req.body;
+    // This will throw an error if they click it too soon 
+    await UserM.generateAndSendOtp(userId, email);
+    return res.json({ message: "New code sent!" });
+  } catch (err) {
+    return res.status(429).json({ error: err.message });
+  }
+}
 }
 export default new UserC()
