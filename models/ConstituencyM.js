@@ -99,5 +99,27 @@ async getAreaByConstituency(constituencyid){
         throw new Error('Error fetching constituency by area ID');
     }
 }
+getAtiveProvisionalConstituencies = async () => {
+    try {
+      const sql = `SELECT * FROM Constituency WHERE seatType = 'Provincial' AND status = 'Active';`;
+      const result = await db.query(sql);
+      return result.rows;
+    } catch (err) {
+      console.error('Error fetching active provincial constituencies:', err);
+      throw new Error('Error fetching active provincial constituencies');
+    }
+  }
+
+  getActiveNationalConstituencies = async () => {
+    try {
+      const sql = `SELECT * FROM Constituency WHERE seatType = 'National' AND status = 'Active';`;
+      const result = await db.query(sql);
+      return result.rows;
+    } catch (err) {
+      console.error('Error fetching active national constituencies:', err);
+      throw new Error('Error fetching active national constituencies');
+    }
+  }
+  
 }
 export default new ConstituencyM();

@@ -20,7 +20,7 @@ class candidateM{
     }
     async getAllCandidates(){
         try{
-            const sql=`SELECT c.*, u.name, u.email, u.cnic, p.name as partyName
+            const sql=`SELECT c.*, u.name, u.email, u.cnic, p.name as partyName,p.logo as partyLogo
             FROM candidate c
             Join party p on c.partyId=p.id
             JOIN users u ON c.userId = u.id;`

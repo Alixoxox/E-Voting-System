@@ -9,6 +9,7 @@ import Parties from '../controllers/partyC.js';
 import userC from '../controllers/userC.js';
 import { authenicator } from '../middleware/authenicator.js';
 import adminC from '../controllers/adminC.js';
+import partyC from '../controllers/partyC.js';
 const router = express.Router();
 const upload = multer({ dest: 'uploads/' }); // temporary storage
 
@@ -22,22 +23,20 @@ const upload = multer({ dest: 'uploads/' }); // temporary storage
  * @swagger
  * /api/admin/fetch/users:
  *   get:
- *     summary: Get all Registered Users
+ *     summary: Get registered users (paginated)
  *     tags: [Admin]
+ *     parameters:
+ *       - in: query
+ *         name: page
+ *         schema: { type: integer, default: 1 }
+ *       - in: query
+ *         name: limit
+ *         schema: { type: integer, default: 10 }
  *     responses:
- *       200:
- *         description: List of all political parties
- *         content:
- *           application/json:
- *             schema:
- *               type: array
- *               items:
- *                 type: object
- *                
- *       500:
- *         description: Server error
+ *       200: { description: Users retrieved successfully }
+ *       500: { description: Server error }
  */
-router.get('/fetch/users',authenicator, userC.fetchUsers);
+router.get('/fetch/users', userC.fetchUsers);
 
 /**
  * @swagger
@@ -113,83 +112,29 @@ router.post('/area/upload-csv',authenicator, upload.single('file'), AreasC.AddAr
 router.post('/cities/upload-csv',authenicator, upload.single('file'), cityC.AddCitycsv);
 
 /**
-* @swagger
-* /api/admin/elections/addSession:
-*   post:
-*     summary: Add a new election session
-*     tags: [Admin]
-*     requestBody:
-*       required: true
-*       content:
-*         application/json:
-*           schema:
-*             type: object
-*             required:
-*               - name
-*               - startDate
-*               - endDate
-*               - seatType
-*               - Province
-*             properties:
-*               name:
-*                 type: string
-*                 description: Name of the election session
-*                 example: "General Elections 2025"
-*               startDate:
-*                 type: string
-*                 format: date
-*                 description: Start date of the election session
-*                 example: "2025-11-01"
-*               endDate:
-*                 type: string
-*                 format: date
-*                 description: End date of the election session
-*                 example: "2025-11-15"
-*               seatType:
-*                 type: string
-*                 enum: [National, Provincial]
-*                 description: Type of seat for this session
-*                 example: "National"
-*               Province:
-*                 type: string
-*                 description: Province for which the election session applies
-*                 example: "Sindh"
-*     responses:
-*       200:
-*         description: Election session added successfully
-*         content:
-*           application/json:
-*             schema:
-*               type: object
-*               properties:
-*                 message:
-*                   type: string
-*                   example: "Election session added successfully"
-*                 sessionId:
-*                   type: integer
-*                   example: 101
-*       400:
-*         description: Bad request - Missing or invalid fields
-*         content:
-*           application/json:
-*             schema:
-*               type: object
-*               properties:
-*                 error:
-*                   type: string
-*                   example: "Missing required field: seatType"
-*       500:
-*         description: Server error
-*         content:
-*           application/json:
-*             schema:
-*               type: object
-*               properties:
-*                 error:
-*                   type: string
-*                   example: "Failed to add election session"
-*/
-
+ * @swagger
+ * /api/admin/elections/addSession:
+ *   post:
+ *     summary: Add a new election session
+ *     tags: [Admin]
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [name, startDate, endDate, seatType, Province]
+ *             properties:
+ *               name: { type: string, example: "General Elections 2025" }
+ *               startDate: { type: string, format: date, example: "2025-11-01" }
+ *               endDate: { type: string, format: date, example: "2025-11-15" }
+ *               seatType: { type: string, enum: [National, Provincial], example: "National" }
+ *               Province: { type: string, example: "Sindh" }
+ *     responses:
+ *       200: { description: Election session added successfully }
+ *       400: { description: Bad request - missing or invalid fields }
+ *       500: { description: Server error }
+ */
 router.post("/elections/addSession",authenicator,ElectionC.CreateEllection);
 
 /**
@@ -490,4 +435,59 @@ router.get('/verify/integrity/:electionId', authenicator, ElectionC.verifyElecti
  *         description: Server error
  */
 router.get('/view/auditLogs',adminC.FetchAuditLogs);
+/**
+ * @swagger
+ * /api/admin/dashboard/stats:
+ *   get:
+ *     summary: Get Command Center Stats
+ *     tags: [Admin]
+ *     responses: { 200: { description: "Stats object" } }
+ */
+router.get('/dashboard/stats', authenicator, adminC.getDashboardStats);
+
+/**
+ * @swagger
+ * /api/admin/parties/candidates/aggregated:
+ *   get:
+ *     summary: Get paginated parties with nested candidates [Parties with their respected candidates]
+ *     tags: [Admin]
+ *     parameters:
+ *       - in: query
+ *         name: page
+ *         schema:
+ *           type: integer
+ *           default: 1
+ *         description: Page number
+ *       - in: query
+ *         name: limit
+ *         schema:
+ *           type: integer
+ *           default: 10
+ *         description: Number of parties per page
+ *     responses:
+ *       200:
+ *         description: Paginated list retrieved successfully
+ *       500:
+ *         description: Server error
+ */
+router.get('/parties/candidates/aggregated', adminC.fetchPartiesWithCandidates);
+/**
+ * @swagger
+ * /api/admin/reject/PartyRegistration/{partyId}:
+ *   post:
+ *     summary: Reject a party registration
+ *     tags: [Admin]
+ *     parameters:
+ *       - in: path
+ *         name: partyId
+ *         required: true
+ *         schema: { type: integer }
+ *         description: ID of the party to reject
+ *     responses:
+ *       200: { description: Party registration rejected successfully }
+ *       400: { description: Bad request }
+ *       500: { description: Server error }
+ */
+router.post('/reject/PartyRegistration/:partyId', partyC.RejectPartyRegistration)
+
 export default router;

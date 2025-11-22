@@ -25,11 +25,23 @@ class UserM {
       console.error("Error creating Users table:", err);
     }
   }
-  async getAllUsers() {
+  async getAllUsers(page=1,limit=10) {
     try {
-      const sql = `SELECT * FROM users;`;
-      const result = await pool.query(sql);
-      return result.rows;
+      const offset = (page - 1) * limit;
+      const sql = `SELECT id,name,email,role,created_at,cnic,is_verified FROM users ORDER BY created_at DESC LIMIT $1 OFFSET $2;`;
+      const result = await pool.query(sql,[limit,offset]);
+      const totalResult = await pool.query(`SELECT COUNT(*) FROM users;`);
+      const totalUsers = parseInt(totalResult.rows[0].count);
+
+      return {
+        data: result.rows,
+        meta: {
+          total: totalUsers,
+          page: parseInt(page),
+          limit: parseInt(limit),
+          totalPages: Math.ceil(totalUsers / limit)
+        }
+      };
     } catch (err) {
       console.error("Error fetching users:", err);
       throw new Error('Error fetching users');
@@ -164,7 +176,7 @@ async EditProfile(userId,name,email,password){
     throw err;
   }
 }
-
+//seed admin users
 async PutAdmin(admins){
     for(const admin of admins){
       try{
@@ -176,7 +188,7 @@ async PutAdmin(admins){
   } }
 }
 
-async generateAndSendOtp(userId, email) {
+async generateAndSendOtp(userId, email,action) {
   const OTP_COOLDOWN_KEY = `otp:cooldown:${userId}`;
   const OTP_LIMIT_KEY = `otp:limit:${userId}`;
   const OTP_COOLDOWN_LEVEL_KEY = `otp:cooldownLevel:${userId}`;
@@ -214,7 +226,7 @@ async generateAndSendOtp(userId, email) {
 
     await redisClient.setEx(OTP_COOLDOWN_KEY, cooldownTime, '1');
     await redisClient.setEx(OTP_COOLDOWN_LEVEL_KEY, LIMIT_WINDOW, (level + 1).toString());    // 5. SEND OTP
-    await sendOTP(email, otp);
+    await sendOTP(email, otp,action);
     return otp;
 
   } catch (err) {

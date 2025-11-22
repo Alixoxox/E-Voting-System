@@ -3,6 +3,10 @@ import userM from "../models/userM.js";
 import auditLogsM from "../models/auditLogsM.js";
 import pool from "../config/db.js";
 import dotenv from "dotenv";
+import { redisClient } from "../server.js";
+import partyM from "../models/partyM.js";
+import candConstM from "../models/candConstM.js";
+import ConstituencyM from "../models/ConstituencyM.js";
 dotenv.config(); // loads variables from .env into process.env
 
 const SECRET_KEY = process.env.SECRET_KEY;
@@ -69,6 +73,89 @@ class adminC {
         await auditLogsM.logAction(req,'FETCH_AUDIT_LOGS_FAILED','ADMIN_'+req.user.id,{ error:err.message||'Failed to fetch audit logs' ,status: 'Error'});
         res.status(500).json({ error: err.message||'Failed to fetch audit logs' });
       }
-    }}
-
+    }
+    async getDashboardStats(req, res){
+    try {
+      // Run parallel queries for speed
+      const [users, elections, votes] = await Promise.all([
+        db.query('SELECT COUNT(*) FROM users WHERE role = $1', ['user']),
+        db.query('SELECT COUNT(*) FROM elections WHERE status = $1', ['Active']),
+        db.query('SELECT Count(*) from party'),
+        db.query('SELECT Count(*) from candidate'),
+        db.query('SELECT Count(*) from constituency'),
+        db.query('SELECT Count(*) from areas'),
+        db.query('SELECT Count(*) from provinces'),
+        db.query('SELECT Count(*) from cities')
+      ]);
+      const result={
+        totalVoters: parseInt(users.rows[0].count),
+        activeElections: parseInt(elections.rows[0].count),
+        totalParties: parseInt(votes.rows[0].count),   
+        totalCandidates: parseInt(votes.rows[0].count),
+        totalConstituencies: parseInt(votes.rows[0].count),
+        totalAreas: parseInt(votes.rows[0].count),
+        totalProvinces: parseInt(votes.rows[0].count),
+        totalCities: parseInt(votes.rows[0].count),
+      }
+      redisClient.setex('dashboard_stats', 300, JSON.stringify(result));
+      return res.json(result);
+    } catch (err) {
+        await auditLogsM.logAction(req,'FAILED_LOAD_DASHBOARD_STATS','ADMIN_'+req.user.id,{ error:err.message||'Failed to load stats' ,status: 'Error'});
+     return res.status(500).json({ error: "Failed to load stats" });
+    }
+  }
+async healthCheck(req, res) {
+try{
+    // Check DB Connection
+    await pool.query('SELECT 1');
+    // Check Redis Connection
+    await redisClient.ping();
+    return res.json({ status: "OK", message: "System is healthy" });
+}catch(err){
+    console.error(err);
+    await auditLogsM.logAction(req,'HEALTH_CHECK_FAILED','SYSTEM',{ error:err.message||'Health check failed' ,status: 'Error'});
+    return res.status(500).json({ status: "Error", message: "Health check failed" });
+}
+}
+async publishElectionResults(req, res) {
+        try {
+          const { electionId } = req.params;
+          await db.query(`UPDATE elections SET is_published = TRUE WHERE id = $1`, [electionId]);
+          await logAction(req, 'PUBLISH_RESULTS', electionId, { status: 'Public' });
+          res.json({ message: "Election results are now public." });
+        } catch (err) {
+          res.status(500).json({ error: err.message });
+        }
+      }
+    
+      fetchPartiesWithCandidates = async (req, res) => {
+        try {
+          const page = req.query.page || 1;
+          const limit = req.query.limit || 10;
+          const result = await partyM.getAllPartiesWithCandidates(page, limit);
+          return res.json(result);
+      
+        } catch (err) {
+          res.status(500).json({ error: err.message });
+        }
+      }
+      fetchAtiveProvisionalConstituencies = async (req, res) => {
+        try {
+          const result = await ConstituencyM.getAtiveProvisionalConstituencies();
+          return res.json(result);
+        } catch (err) {
+            await auditLogsM.logAction(req,'FAILED_FETCH_PROVINCIAL_CONSTITUENCIES' ,'SYSTEM',{ error:err.message||'Failed to fetch provincial constituencies' ,email:req.user.email,status: 'Error'});
+          res.status(500).json({ error: err.message });
+        }
+      }
+      fetchActiveNationalConstituencies = async (req, res) => {
+        try {
+          const result = await ConstituencyM.getActiveNationalConstituencies();
+          return res.json(result);
+        } catch (err) {
+            await auditLogsM.logAction(req,'FAILED_FETCH_NATIONAL_CONSTITUENCIES' ,'SYSTEM',{ error:err.message||'Failed to fetch national constituencies' ,email:req.user.email,status: 'Error'});
+          res.status(500).json({ error: err.message });
+        }
+      }
+}
 export default new adminC();

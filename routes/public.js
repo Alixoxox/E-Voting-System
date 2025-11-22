@@ -7,6 +7,7 @@ import ProvinceC from '../controllers/ProvinceC.js';
 import ConstituencyC from '../controllers/ConstituencyC.js';
 import Parties from '../controllers/partyC.js';
 import userC from '../controllers/userC.js';
+import adminC from '../controllers/adminC.js';
 const router = express.Router();
 
 /**
@@ -285,7 +286,7 @@ router.get('/active/Elections', ElectionC.getActiveElections);
  * /api/public/resend/otp:
  *   post:
  *     summary: Resend Verification/MFA OTP
- *     description: Sends a new OTP to the user's email with cooldown and rate limit protection [For both user and admin].
+ *     description: Sends a new OTP to the user's email with cooldown and rate limit protection [For user, party and admin].
  *     tags: [Public]
  *     requestBody:
  *       required: true
@@ -311,4 +312,63 @@ router.get('/active/Elections', ElectionC.getActiveElections);
  *         description: Failed to send email.
  */
 router.post('/resend/otp', userC.resendOtp);
+/**
+ * @swagger
+ * /api/public/elections/past-results:
+ *   get:
+ *     summary: Get past elections and winners
+ *     tags: [Public]
+ *     responses:
+ *       200:
+ *         description: List of ended elections with winners
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: array
+ *               items:
+ *                 type: object
+ *                 properties:
+ *                   name: { type: string }
+ *                   endDate: { type: string, format: date }
+ *                   winners:
+ *                     type: array
+ *                     items:
+ *                       type: object
+ *                       properties:
+ *                         candidate_name: { type: string }
+ *                         party_name: { type: string }
+ */
+router.get('/elections/past-results', ElectionC.getPastResults);
+/**
+ * @swagger
+ * /api/public/active/constituencies/provisional:
+ *   get:
+ *     summary: Get all active provisional constituencies
+ *     tags: [Public]
+ *     responses:
+ *       200: { description: List retrieved successfully }
+ *       500: { description: Server error }
+ */
+router.get('/active/constituencies/provisional', adminC.fetchAtiveProvisionalConstituencies);
+
+/**
+ * @swagger
+ * /api/public/active/constiuencies/national:
+ *   get:
+ *     summary: Get all active national constituencies
+ *     tags: [Public]
+ *     responses:
+ *       200: { description: List retrieved successfully }
+ *       500: { description: Server error }
+ */
+router.get('/active/constiuencies/national', adminC.fetchActiveNationalConstituencies);
+/**
+ * @swagger
+ * /api/public/health:
+ *   get:
+ *     summary: Get Health Stats
+ *     tags: [Public]
+ *     responses: { 200: { description: "Health Stats" } }
+ */
+router.get('/health', adminC.healthCheck);
 export default router;

@@ -221,7 +221,35 @@ router.post('/account/register',upload.single('image'), Parties.createParty);
  *         description: Server error
  */
 router.post('/account/signin', Parties.LoginParty);
-
+/**
+ * @swagger
+ * /api/parties/account/verify:
+ *   post:
+ *     summary: Verify Party account
+ *     tags: [Parties]
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - partyId
+ *               - otp
+ *             properties:
+ *               partyId:
+ *                 type: integer
+ *               otp:
+ *                 type: string
+ *     responses:
+ *       200:
+ *         description: Party Verified
+ *       400:
+ *         description: Bad request
+ *       500:
+ *         description: Server error
+ */
+router.post('/account/verify', Parties.verifyParty);
 /**
  * @swagger
  * /api/parties/candidate/fighting/constituency:

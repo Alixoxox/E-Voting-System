@@ -60,5 +60,14 @@ CreateEllection = async (req, res) => {
       res.status(500).json({ error: err.message||'Failed to verify election integrity' });
     }
   }
+
+getPastResults = async (req, res) => {
+  try {
+    const results = await ElectionM.getPastElectionResults();
+    res.json(results);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+}
 }
 export default new ElectionC();

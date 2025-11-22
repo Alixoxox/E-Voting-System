@@ -1,8 +1,8 @@
 import cron from 'node-cron';
 import db from '../config/db.js';
-import auditLogsM from '../models/auditLogsM.js';
+import { logAction } from '../utils/auditLogger.js'; // Ensure named import if exported that way
 
-// everyday at midnight
+// Everyday at midnight
 cron.schedule('0 0 * * *', async () => {
   console.log('🌅 Running daily election result check...');
 
@@ -15,15 +15,13 @@ cron.schedule('0 0 * * *', async () => {
     for (const election of endedElections) {
       const { id: electionId } = election;
 
-      // Get all candidates ordered by votes within each constituency
       const { rows: results } = await db.query(`
         SELECT candidateid, constituencyid, totalvotes
         FROM candidateconstituency
         WHERE electionid = $1
-        ORDER BY constituencyid, votes DESC
+        ORDER BY constituencyid, totalvotes DESC
       `, [electionId]);
 
-      // Pick top 1 per constituency
       const topWinners = new Map();
       for (const row of results) {
         if (!topWinners.has(row.constituencyid)) {
@@ -31,7 +29,6 @@ cron.schedule('0 0 * * *', async () => {
         }
       }
 
-      // Mark only top winners as "won"
       for (const [_, winner] of topWinners) {
         await db.query(`
           UPDATE candidateconstituency
@@ -40,22 +37,25 @@ cron.schedule('0 0 * * *', async () => {
         `, [winner.candidateid, winner.constituencyid, electionId]);
       }
 
-      // Mark others as "lost"
       await db.query(`
         UPDATE candidateconstituency
         SET approvalStatus = 'Lost'
         WHERE electionid = $1 AND approvalStatus != 'Won'
       `, [electionId]);
 
-      // Mark election results declared
       await db.query(`
         UPDATE elections SET status = 'Ended' WHERE id = $1
       `, [electionId]);
-      await auditLogsM.logAction('ELECTION_RESULTS_DECLARED', { electionId ,status:'Success' });
-      console.log(` Declared results for election ${electionId}`);
+
+      await logAction(null, 'ELECTION_RESULTS_DECLARED', `Election_${electionId}`, { 
+          status: 'Success', 
+          winnersCount: topWinners.size 
+      });
+      
+      console.log(`✅ Declared results for election ${electionId}`);
     }
   } catch (err) {
-    await auditLogsM.logAction('DAILY_ELECTION_RESULT_CHECK_FAILED', { error: err.message,status:'Error' });
+    await logAction(null, 'DAILY_RESULT_CHECK_FAILED', 'SYSTEM', { error: err.message,status: 'Error', });
     console.error(' Error running daily election result check:', err);
   }
 });

@@ -49,46 +49,48 @@ class votesM {
         throw new Error('Error fetching voting chain');
       }
     }
-    async CastVote(candidateParticipatingId, userId, electionId, previousHash, currentHash){
-      try{
-        // Check if the user has already voted in this election
-        const voteCheck = await pool.query(`
-          SELECT * FROM votes 
-          WHERE userId = $1 AND electionId = $2
-        `, [userId, electionId]);
-    
-        if(voteCheck.rows.length > 0){
-          return { message: 'User has already casted his vote' };
-        }
-    
-        // Record the vote WITH HASHES
-        await pool.query(`
-          INSERT INTO votes (userId, candidateConstid, electionId, previous_hash, current_hash) 
-          VALUES ($1, $2, $3, $4, $5)
-        `, [userId, candidateParticipatingId, electionId, previousHash, currentHash]);
-    
-        // Increment the total votes for the candidate in candidateConstituency
-        await pool.query(`
-          UPDATE candidateConstituency 
-          SET totalVotes = totalVotes + 1 
-          WHERE id = $1
-        `, [candidateParticipatingId]);
-    
-        const userArea = await pool.query(
-          `SELECT areaId FROM users WHERE id = $1`,
-          [userId]
-        );
-        const areaId = userArea.rows[0].areaid;
-    
-        // use areaId + electionId for socket broadcasting
-        return { message: 'Vote cast successfully', areaId, electionId };
-        
-      }catch(err){
-        console.error('Error casting vote:', err);
-        throw err;
+    async getLastVoteHash(electionId) {
+      try {
+          const sql = `SELECT current_hash FROM votes WHERE electionId = $1 ORDER BY id DESC LIMIT 1`;
+          const result = await pool.query(sql, [electionId]);
+          return result.rows.length > 0 ? result.rows[0].current_hash : null;
+      } catch (err) {
+          return null;
       }
-    }
-    async votingHistory(userId){
+  }
+  
+  // 2. Fix CastVote return
+  async CastVote(candidateParticipatingId, userId, electionId, previousHash, currentHash){
+      try{
+          // Check existing vote
+          const voteCheck = await pool.query(`SELECT id FROM votes WHERE userId = $1 AND electionId = $2`, [userId, electionId]);
+      
+          if(voteCheck.rows.length > 0){
+              throw new Error('User has already casted his vote'); // Throw error instead of returning message
+          }
+      
+          // Insert with Hashes
+          await pool.query(`
+              INSERT INTO votes (userId, candidateConstid, electionId, previous_hash, current_hash) 
+              VALUES ($1, $2, $3, $4, $5)
+          `, [userId, candidateParticipatingId, electionId, previousHash, currentHash]);
+      
+          // Update Count
+          await pool.query(`
+              UPDATE candidateConstituency SET totalVotes = totalVotes + 1 WHERE id = $1
+          `, [candidateParticipatingId]);
+      
+          // Get Area for Socket
+          const userArea = await pool.query(`SELECT areaId FROM users WHERE id = $1`, [userId]);
+          const areaId = userArea.rows[0].areaid;
+          return { areaId, electionId };
+      } catch(err){
+          console.error('Error casting vote:', err);
+          throw err;
+      }
+  }
+    async votingHistory(userId,limit,page){
+      const offset=(limit*(page-1));
     try{
       const sql=`
       SELECT v.*, cc.id as candidateParticipatingId, u.name AS candidateName, u.email AS candidateEmail, u.cnic AS candidateCnic, p.name AS partyName, e.name AS electionName, con.name AS constituencyName
@@ -99,9 +101,10 @@ class votesM {
       JOIN party p ON c.partyId = p.id
       JOIN elections e ON v.electionId = e.id
       JOIN constituency con ON cc.constituencyId = con.id
-      WHERE v.userId = $1;
-      `;
-      const result=await pool.query(sql, [userId]);
+      WHERE v.userId = $1 
+      ORDER BY v.castedAt DESC 
+      Limit $2 OFFSET $3;`;
+      const result=await pool.query(sql, [userId,limit,offset]);
       return result.rows;
     }catch(err){
       console.error('Error fetching voting history:', err);

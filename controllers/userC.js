@@ -1,5 +1,6 @@
 import UserM from '../models/userM.js';
 import bcrypt from 'bcrypt';
+import crypto from 'crypto';
 import {io} from '../server.js';
 import jwt from 'jsonwebtoken';
 import dotenv from "dotenv";
@@ -12,9 +13,12 @@ dotenv.config(); // loads variables from .env into process.env
 
 const SECRET_KEY = process.env.SECRET_KEY;
 class UserC{
+  //paginate this
 fetchUsers = async (req, res) => {
   try {
-    const users = await UserM.getAllUsers();
+    const page = req.query.page || 1;
+    const limit = req.query.limit || 10;
+    const users = await UserM.getAllUsers(page, limit);
     return res.json(users);
   } catch (err) {
     console.error(err);
@@ -28,7 +32,7 @@ createUser = async (req, res) => {
     const hashedPassword = await bcrypt.hash(password, 10);
     const result=await UserM.createUser(name, email, cnic, hashedPassword, province, city, area, 'user');
     // Send OTP
-    await UserM.generateAndSendOtp(result.id, email);
+    await UserM.generateAndSendOtp(result.id, email, 'User Account Verification');
     return res.json({message:'User created successfully. Please verify your email using the OTP sent.', userId: result.id});
   }catch(Err){
     console.log(Err)
@@ -82,25 +86,46 @@ async viewCandidatesForUserElection(req,res){
     await auditLogsM.logAction(req,'FAILED_FETCH_CANDIDATES_FOR_USER_ELECTION','Election_'+req.params.electionId,{ error:err.message||'Failed to fetch candidates for current Election' ,email:req.user.email,status: 'Error'});
     return res.status(500).json({error:err.message||'Failed to fetch candidates for current Election'});
   }
-}// Cast vote with leaderboard cache update
+}
 async castVote(req, res) {
   const { candidateParticipatingId, electionId } = req.body;
   const userId = req.user.id;
+
   try {
-    const result = await votesM.CastVote(candidateParticipatingId, userId, electionId);
-    res.status(200).json(result);
+    // 2. 🔒 HASHING LOGIC START
+    // Get the previous link in the chain
+    let previousHash = await votesM.getLastVoteHash(electionId);
+    if (!previousHash) previousHash = "GENESIS_HASH_START_0000000000";
+
+    // Create current hash
+    const dataString = `${previousHash}-${userId}-${candidateParticipatingId}-${electionId}`;
+    const currentHash = crypto.createHash('sha256').update(dataString).digest('hex');
+    // 🔒 HASHING LOGIC END
+
+    // 3. Call Model with ALL 5 Arguments
+    const result = await votesM.CastVote(candidateParticipatingId, userId, electionId, previousHash, currentHash);
+
+    // 4. Send Email Receipt (Fire & Forget)
+    sendVoteReceipt(req.user.email, currentHash, "General Election 2025").catch(console.error);
+
+    // 5. Return Success to Frontend
+    res.status(200).json({
+      message: 'Vote cast successfully',
+      receiptCode: currentHash, // User sees this
+      areaId: result.areaId,
+      electionId: result.electionId
+    });
+
+    // 6. Update Real-time Leaderboard (Socket.io)
     setImmediate(async () => {
       try {
         const redisKey = `leaderboard:${result.areaId}:${result.electionId}`;
         let leaderboard;
-        if(await redisClient.exists(redisKey)){
-          leaderboard = await redisClient.get(redisKey);
-          leaderboard = JSON.parse(leaderboard);
-        } else {
-          leaderboard = await UserM.viewCandidatesForUserElection(result.areaId, result.electionId);
-          await redisClient.setEx(redisKey, 10,JSON.stringify(leaderboard)); // 10 sec TTL
-        }
-        // Emit updated leaderboard to clients
+        
+        // Invalidate or Update Cache
+        leaderboard = await UserM.viewCandidatesForUserElection(result.areaId, result.electionId);
+        await redisClient.setEx(redisKey, 10, JSON.stringify(leaderboard));
+
         const room = `const-${result.areaId}-${result.electionId}`;
         io.to(room).emit("leaderboardUpdate", {
           message: "Leaderboard updated",
@@ -109,30 +134,25 @@ async castVote(req, res) {
           leaderboard,
         });
       } catch (err) {
-        console.error("Error updating leaderboard cache:", err);
-        return res.json({ error: err.message||"Error updating leaderboard cache" });
+        console.error("Socket Error:", err.message);
       }
     });
+
   } catch (err) {
     console.error("Error Casting Vote:", err);
-    await auditLogsM.logAction(req,'FAILED_CAST_VOTE','User_'+userId,{ error:err.message||'Failed to cast vote' ,email:req.user.email,status: 'Error'});
-    res.status(500).json({ error: err.message||"Error casting vote" });
+    // Log Failure
+    await logAction(req, 'FAILED_CAST_VOTE', `User_${userId}`, { error: err.message });
+    res.status(500).json({ error: err.message || "Error casting vote" });
   }
 }
 
 // Voting history with cache
 async votingHistory(req, res) {
   const userId = req.user.id;
-  const redisKey = `votingHistory:${userId}`;
+  const limit = req.query.limit || 10;
+  const page= req.query.page || 1;
   try {
-    // 1️⃣ Try cache first
-    let votingHistory ;
-    if (await redisClient.exists(redisKey)) {
-      votingHistory = await redisClient.get(redisKey);
-      return res.json(JSON.parse(votingHistory));
-    }
-    votingHistory = await votesM.votingHistory(userId);
-    await redisClient.setEx(redisKey, 120 ,JSON.stringify(votingHistory)); // 2 min TTL
+    votingHistory = await votesM.votingHistory(userId,limit,page);
     return res.json(votingHistory);
   } catch (err) {
     console.error("Error fetching voting history:", err);
@@ -165,10 +185,11 @@ async forgotPasswordRequest(req, res) {
     if (!resDb || resDb.rows.length === 0) throw new Error("User not found");
     
     const userId = resDb.rows[0].id;
-    await UserM.generateAndSendOtp(userId, email);
+    await UserM.generateAndSendOtp(userId, email, 'Password Reset OTP');
     
     return res.json({ message: "OTP sent to email", userId });
   } catch (err) {
+    await auditLogsM.logAction(req,'FAILED_PASSWORD_RESET_REQUEST','User_'+(req.body.userId||'UNKNOWN'),{ error:err.message||'Failed to request password reset' ,email:req.body.email,status: 'Error'});
     return res.status(400).json({ error: err.message });
   }
 }
@@ -180,6 +201,7 @@ async resetPasswordWithOtp(req, res) {
     await pool.query("UPDATE users SET password = $1 WHERE id = $2", [hashedPassword, userId]);
     return res.json({ message: "Password reset successfully" });
   } catch (err) {
+    await auditLogsM.logAction(req,'FAILED_PASSWORD_RESET','User_'+req.body.userId,{ error:err.message||'Failed to reset password' ,status: 'Error'});
     return res.status(400).json({ error: err.message });
   }
 }
@@ -187,9 +209,10 @@ resendOtp = async (req, res) => {
   try {
     const { userId, email } = req.body;
     // This will throw an error if they click it too soon 
-    await UserM.generateAndSendOtp(userId, email);
+    await UserM.generateAndSendOtp(userId, email, 'Resend OTP');
     return res.json({ message: "New code sent!" });
   } catch (err) {
+    await auditLogsM.logAction(req,'FAILED_RESEND_OTP','User_'+req.body.userId,{ error:err.message||'Failed to resend OTP' ,email:req.body.email,status: 'Error'});
     return res.status(429).json({ error: err.message });
   }
 }

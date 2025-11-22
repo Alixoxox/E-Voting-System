@@ -8,6 +8,8 @@ dotenv.config(); // loads variables from .env into process.env
 const SECRET_KEY = process.env.SECRET_KEY;
 import parseCsvWithValidation from "../utils/parseCsv.js";
 import auditLogsM from "../models/auditLogsM.js";
+import userM from "../models/userM.js";
+import pool from "../config/db.js";
 class Parties {
   getParties = async (req, res) => {
     try {
@@ -53,15 +55,26 @@ class Parties {
       const { name, abbreviation, email, password } = req.body;
       let hashedpass=bcrypt.hash(password,10)
       let result= await partyM.createParty(name, abbreviation, imageUrl,email,hashedpass);
-
-      const PartyData={id:result.id,name:result.name,email:result.email};
-      const token=jwt.sign(PartyData, SECRET_KEY, {expiresIn:'24h'})
-      await auditLogsM.logAction(req,'PARTY_CREATED','Party_'+result.id,{partyName:result.name,partyEmail:result.email,status: 'Success'});
-      return res.json({ message: "Party created successfully" ,PartyData,token});
+      await userM.generateAndSendOtp(`party:${result.id}`, email, 'Party Account Verification');
+      await auditLogsM.logAction(req, 'PARTY_REGISTERED', `Party_${result.id}`, { partyName: result.name, status: 'Pending Verification' });
+      return res.json({message: "Party registered. Please verify your email to activate account.", partyId: result.id });     
     } catch (Err) {
       console.log(Err);
       await auditLogsM.logAction(req,'PARTY_CREATION_FAILED','PARTY_CREATION_FAILED',{error:Err.message,status: 'Error'});
       return res.status(500).json({ error: Err.message||"Failed to create party" });
+    }
+  }
+  async verifyParty(req, res) {
+    try {
+      const { partyId, otp } = req.body;
+        await userM.verifyOtp(`party:${partyId}`, otp);
+  
+      // 2. Update Status to 'Approved'
+      await partyM.markVerified(partyId);
+  
+      return res.json({ message: "Account Approved! You can now log in." });
+    } catch (err) {
+      return res.status(400).json({ error: err.message });
     }
   }
   async LoginParty(req, res) {
@@ -75,6 +88,18 @@ class Parties {
       console.error(err);
       await auditLogsM.logAction(req,'PARTY_LOGIN_FAILED','PARTY_LOGIN_FAILED',{email:req.body.email,error:err.message,status: 'Error'});
       return res.status(500).json({ error: err.message||"Failed to login party" });
+    }
+  }
+  async RejectPartyRegistration(req, res) {
+    try {
+      const { partyId } = req.params;
+      await pool.query(`UPDATE party SET approvalStatus = 'Rejected' WHERE id = $1`, [partyId]);
+      auditLogsM.logAction(req,'PARTY_REGISTRATION_REJECTED',`Party_${partyId}`,{status: 'Success'});
+      return res.json({ message: "Party registration rejected successfully" });
+    } catch (err) {
+      console.error(err);
+      auditLogsM.logAction(req,'PARTY_REGISTRATION_REJECTION_FAILED',`Party_${req.params.partyId}`,{error:err.message,status: 'Error'});
+      return res.status(500).json({ error: err.message||"Failed to reject party registration" });
     }
   }
 }

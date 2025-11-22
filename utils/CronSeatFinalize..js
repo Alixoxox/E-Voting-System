@@ -1,22 +1,20 @@
 import cron from "node-cron";
 import db from "../config/db.js";
-import auditLogsM from "../models/auditLogsM.js";
-//every 2 days at midnight
+import { logAction } from "../utils/auditLogger.js";
+
+// Every 2 days at midnight
 cron.schedule("0 0 */2 * *", async () => {
   console.log("🕐 Running auto seat chooser...");
 
   try {
-    // find ended elections where candidates haven't chosen seat
     const { rows: elections } = await db.query(`
       SELECT id FROM elections 
-      WHERE status = 'Ended' 
-      AND finalized IS FALSE
+      WHERE status = 'Ended' AND finalized IS FALSE
     `);
 
     for (const election of elections) {
       const { id: electionId } = election;
 
-      // get candidates who won multiple seats
       const { rows: multiWinners } = await db.query(`
         SELECT candidateid 
         FROM candidateconstituency 
@@ -28,7 +26,6 @@ cron.schedule("0 0 */2 * *", async () => {
       for (const candidate of multiWinners) {
         const { candidateid } = candidate;
 
-        // choose the highest-vote seat automatically
         const { rows: topSeat } = await db.query(`
           SELECT id, constituencyid FROM candidateconstituency 
           WHERE electionid = $1 AND candidateid = $2 
@@ -38,16 +35,24 @@ cron.schedule("0 0 */2 * *", async () => {
         if (!topSeat.length) continue;
 
         const chosenSeatId = topSeat[0].id;
-        const chosenConstituency = topSeat[0].constituencyid;
 
-        // delete other won seats
+        // Delete other won seats
         const { rows: deleted } = await db.query(`
           DELETE FROM candidateconstituency 
           WHERE electionid = $1 AND candidateid = $2 
           AND id != $3 RETURNING constituencyid
         `, [electionId, candidateid, chosenSeatId]);
 
-        // promote runner-ups for deleted seats
+        // ⚠️ ADDED LOG: Log exactly what was deleted (Critical for Audit)
+        if(deleted.length > 0) {
+             await logAction(null, 'SYSTEM_AUTO_DROP_SEAT', `Candidate_${candidateid}`, {
+                electionId,
+                keptSeat: chosenSeatId,
+                droppedConstituencies: deleted.map(d => d.constituencyid)
+            });
+        }
+
+        // Promote runner-ups
         for (const seat of deleted) {
           const { rows: runnerUp } = await db.query(`
             SELECT id FROM candidateconstituency
@@ -61,19 +66,25 @@ cron.schedule("0 0 */2 * *", async () => {
               SET approvalstatus = 'Won'
               WHERE id = $1
             `, [runnerUp[0].id]);
+            
+            // Log promotion
+            await logAction(null, 'SYSTEM_PROMOTE_RUNNERUP', `Seat_${runnerUp[0].id}`, {
+                originalWinner: candidateid
+            });
           }
         }
       }
 
-      // mark election finalized
       await db.query(`
         UPDATE elections SET finalized = TRUE WHERE id = $1
       `, [electionId]);
-        await auditLogsM.logAction('AUTO_SEAT_ASSIGNMENT_COMPLETED', { electionId ,status:'Success'});
-      console.log(`Auto seat assignment completed for election ${electionId}`);
+
+      // ⚠️ FIX: Correct arguments
+      await logAction(null, 'AUTO_SEAT_ASSIGNMENT_COMPLETED', `Election_${electionId}`, { status: 'Success' });
+      console.log(`✅ Auto seat assignment completed for election ${electionId}`);
     }
   } catch (err) {
-    await auditLogsM.logAction('AUTO_SEAT_ASSIGNMENT_FAILED', { error: err.message ,status:'Error'});
-    console.error("Error in auto seat chooser:", err);
+    await logAction(null, 'AUTO_SEAT_ASSIGNMENT_FAILED', 'SYSTEM', { error: err.message });
+    console.error("❌ Error in auto seat chooser:", err);
   }
 });

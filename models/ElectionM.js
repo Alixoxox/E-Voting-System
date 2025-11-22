@@ -52,5 +52,52 @@ class ElectionM{
             throw new Error('Error fetching active elections');
         }
     }
+    // ElectionM.js
+
+async getPastElectionResults() {
+    try {
+      // Fetch all ended elections
+      const electionsQuery = `
+        SELECT id, name, seatType, startDate, end_date, provinceId 
+        FROM elections 
+        WHERE status = 'Ended' AND finalized = TRUE
+        ORDER BY end_date DESC
+      `;
+      const { rows: elections } = await db.query(electionsQuery);
+  
+      // For each election, fetch the winners
+      // We use Promise.all to run these queries in parallel for speed
+      const results = await Promise.all(elections.map(async (election) => {
+        const winnersQuery = `
+          SELECT 
+            c.id AS candidate_id,
+            u.name AS candidate_name,
+            p.name AS party_name,
+            p.logo AS party_logo,
+            con.name AS constituency_name,
+            cc.totalvotes
+          FROM candidateconstituency cc
+          JOIN candidate c ON cc.candidateid = c.id
+          JOIN users u ON c.userid = u.id
+          JOIN party p ON c.partyid = p.id
+          JOIN constituency con ON cc.constituencyid = con.id
+          WHERE cc.electionid = $1 AND cc.approvalstatus = 'Won'
+        `;
+        
+        const { rows: winners } = await db.query(winnersQuery, [election.id]);
+        
+        return {
+          ...election,
+          winners: winners
+        };
+      }));
+  
+      return results;
+  
+    } catch (err) {
+      console.error("Error fetching past results:", err);
+      throw new Error("Failed to retrieve past election results");
+    }
+  }
 }
 export default new ElectionM();
