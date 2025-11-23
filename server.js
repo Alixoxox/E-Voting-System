@@ -5,6 +5,7 @@ import swaggerJsdoc from 'swagger-jsdoc';
 import { swaggerOptions } from './utils/swagerConfig.js';
 import rateLimit from 'express-rate-limit';
 // Routes
+import cors from 'cors';
 import userRoutes from './routes/userR.js';
 import AdminRoutes from './routes/adminR.js';
 import partyRoutes from './routes/partyR.js';
@@ -24,6 +25,7 @@ export let redisClient = createClient();
 redisClient.on('error', (err) => console.log('Redis Client Error', err));
 await redisClient.connect();
 export const io = new Server(server, { cors: { origin: "*" } });
+app.use(cors());
 
 // Pass `io` to routes if needed
 app.set("io", io);

@@ -115,7 +115,7 @@ async signinUser(email, password){
     }
 
     // 2. Find User (Main DB)
-    const res = await pool.query(`SELECT id, name, email, password,is_verified,areaid FROM users WHERE email = $1`, [email]);
+    const res = await pool.query(`SELECT id, name, email, password,is_verified,areaid,cnic FROM users WHERE email = $1`, [email]);
     if (res.rows.length === 0) throw new Error('User not found');
     const user = res.rows[0];
     const isMatch = await bcrypt.compare(password, user.password);
