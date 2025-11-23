@@ -77,8 +77,8 @@ async viewCandidatesForUserElection(req,res){
     console.log('User Area ID:', areaId);
     if(!areaId){ throw new Error('Sorry You Are Not Eligible');}
     const {electionId}=req.params;
-    if(redisClient.exists(`viewCandidatesForUserElection:${areaId}:${electionId}`)){
-      let cachedCandidates=await redisClient.get(`viewCandidatesForUserElection:${areaId}:${electionId}`);
+    if (await redisClient.exists(`viewCandidatesForUserElection:${areaId}:${electionId}`)) {
+      let cachedCandidates = await redisClient.get(`viewCandidatesForUserElection:${areaId}:${electionId}`);
       return res.json(JSON.parse(cachedCandidates));
     }
     const candidates=await UserM.viewCandidatesForUserElection(areaId,electionId);

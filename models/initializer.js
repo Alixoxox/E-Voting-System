@@ -17,11 +17,11 @@ const admin=[
 ]
 
 export async function initTables() {
-  await UserM.createTable();
   await ProvinceM.createTable();
   await partyM.createTable();
   await cityM.createTable();
   await areaM.createTable();
+  await UserM.createTable();
   await ConstituencyM.createTable();
   await ElectionM.createTable();
   await candidateM.createTable();

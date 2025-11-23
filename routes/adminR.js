@@ -490,4 +490,51 @@ router.get('/parties/candidates/aggregated', authenicator,adminC.fetchPartiesWit
  */
 router.post('/reject/PartyRegistration/:partyId',authenicator ,partyC.RejectPartyRegistration)
 
+import { runDailyElectionCheck, runAutoSeatChooser } from '../utils/Services.js';
+import db from '../config/db.js';
+/**
+ * @swagger
+ * /api/admin/end-election/{electionId}:
+ *   post:
+ *     summary: End an election and process results
+ *     tags: [Admin]
+ *     parameters:
+ *       - in: path
+ *         name: electionId
+ *         required: true
+ *         schema:
+ *           type: integer
+ *         description: Election ID
+ *     responses:
+ *       200:
+ *         description: Election ended successfully
+ *         content:
+ *           application/json:
+ *             example: { "message": "Election 5 ended and processed successfully." }
+ *       500:
+ *         description: Server error
+ *         content:
+ *           application/json:
+ *             example: { "error": "Database connection failed" }
+ */
+router.post('/end-election/:id', async (req, res) => {
+  const electionId = req.params.id;
+
+  try {
+    // Optional: set end_date to NOW() and leave status Active
+    await db.query(`UPDATE elections SET end_date = NOW() WHERE id = $1`, [electionId]);
+
+    // 1️⃣ Run daily election check (calculates winners)
+    await runDailyElectionCheck();
+
+    // 2️⃣ Run auto seat chooser (handles multi-seat logic)
+    await runAutoSeatChooser();
+
+    res.json({ message: `Election ${electionId} ended and processed successfully.` });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
 export default router;

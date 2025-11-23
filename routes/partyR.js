@@ -97,6 +97,7 @@ router.get('/candidates', authenicator,CandidateC.getCandidatesByPartyId);
  *             required:
  *               - UserData
  *               - Candidate
+ *               - image
  *             properties:
  *               UserData:
  *                 type: string

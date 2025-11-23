@@ -148,15 +148,23 @@ async viewCandidatesForUserElection(areaId, electionId){
   console.log('Viewing from db:', areaId, 'and electionId:', electionId);
   try{
     const sql=`
-    SELECT c.*,cc.id as candidateParticipatingId,cc.totalVotes ,u.name, u.email, u.cnic, p.name AS partyName
-    FROM candidateConstituency cc
-    JOIN candidate c ON cc.candidateId = c.id
-    JOIN users u ON c.userId = u.id
-    JOIN party p ON c.partyId = p.id
-    JOIN constituency con ON cc.constituencyId = con.id
-    JOIN constituency_area ca ON ca.constituencyId = con.id
-    WHERE ca.areaId = $1
-      AND cc.electionId = $2;
+    SELECT DISTINCT 
+    c.*,
+    cc.id AS candidateParticipatingId,
+    cc.totalVotes,
+    u.name,
+    u.email,
+    u.cnic,
+    p.name AS partyName
+FROM candidateConstituency cc
+JOIN candidate c ON cc.candidateId = c.id
+JOIN users u ON c.userId = u.id
+LEFT JOIN party p ON c.partyId = p.id
+JOIN constituency con ON cc.constituencyId = con.id
+JOIN constituency_area ca ON ca.constituencyId = con.id
+WHERE ca.areaId = $1
+  AND cc.electionId = $2;
+
     `;
     const result=await pool.query(sql, [areaId, electionId]);
     return result.rows;
