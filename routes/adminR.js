@@ -490,8 +490,7 @@ router.get('/parties/candidates/aggregated', authenicator,adminC.fetchPartiesWit
  */
 router.post('/reject/PartyRegistration/:partyId',authenicator ,partyC.RejectPartyRegistration)
 
-import { runDailyElectionCheck, runAutoSeatChooser } from '../utils/Services.js';
-import db from '../config/db.js';
+
 /**
  * @swagger
  * /api/admin/end-election/{electionId}:
@@ -517,24 +516,51 @@ import db from '../config/db.js';
  *           application/json:
  *             example: { "error": "Database connection failed" }
  */
-router.post('/end-election/:id', async (req, res) => {
-  const electionId = req.params.id;
+router.post('/end-election/:id',authenicator,adminC.EndEllections);
 
-  try {
-    // Optional: set end_date to NOW() and leave status Active
-    await db.query(`UPDATE elections SET end_date = NOW() WHERE id = $1`, [electionId]);
 
-    // 1️⃣ Run daily election check (calculates winners)
-    await runDailyElectionCheck();
+/**
+ * @swagger
+ * /api/admin/recent-activity:
+ *   get:
+ *     summary: Get recent system and admin activity
+ *     description: Returns the 20 most recent actions performed by admins or the system. Parses audit log details into readable messages.
+ *     tags: [Admin]
+ *     responses:
+ *       200:
+ *         description: Recent activity fetched successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: array
+ *               items:
+ *                 type: object
+ *                 properties:
+ *                   actor:
+ *                     type: string
+ *                     description: Name of the actor (admin or SYSTEM)
+ *                     example: "Sufyan"
+ *                   message:
+ *                     type: string
+ *                     description: Human-readable description of the action
+ *                     example: "New election created: General Elections 2026"
+ *                   timestamp:
+ *                     type: string
+ *                     format: date-time
+ *                     description: When the action occurred
+ *                     example: "2025-11-23T13:34:44.313Z"
+ *       500:
+ *         description: Failed to fetch recent activity
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 error:
+ *                   type: string
+ *                   example: "Internal server error"
+ */
 
-    // 2️⃣ Run auto seat chooser (handles multi-seat logic)
-    await runAutoSeatChooser();
-
-    res.json({ message: `Election ${electionId} ended and processed successfully.` });
-  } catch (err) {
-    console.error(err);
-    res.status(500).json({ error: err.message });
-  }
-});
+router.get("/recent-activity", authenicator, adminC.getRecentActivity);
 
 export default router;

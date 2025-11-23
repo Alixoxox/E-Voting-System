@@ -105,6 +105,109 @@ class Parties {
       return res.status(500).json({ error: err.message||"Failed to reject party registration" });
     }
   }
-}
+  async getRecentActivity(req, res) {
+      try {
+        const partyName = req.user.name;
+    
+        const { rows } = await pool.query(`
+          SELECT actor_name, action, details, timestamp
+          FROM audit_logs
+          WHERE details::json->>'partyName' = $1
+          ORDER BY timestamp DESC
+          LIMIT 20
+        `, [partyName]);
+    
+        const activities = rows.map(row => {
+          let message = "";
+          const d = row.details ? JSON.parse(row.details) : {};
+    
+          switch (row.action) {
+            case "PARTY_REGISTERED":
+              message = `${d.partyName} registered (${d.status})`;
+              break;
+            case "ADD_CANDIDATE":
+              message = `${d.email} added as candidate`;
+              break;
+            case "FAILED_ADD_CANDIDATE":
+              message = `Failed to add candidate: ${d.error}`;
+              break;
+            case "ALLOCATE_CANDIDATE_ELECTION_CONST":
+              message = `${d.msg} (Election ${d.electionId}, Constituency ${d.constituencyId})`;
+              break;
+            case "SEAT_ALLOCATED":
+              message = `Seat allocated: ${d.seat} - ${d.constituency}`;
+              break;
+            case "CANDIDATE_REMOVED":
+              message = `${d.msg}`;
+              break;
+            default:
+              message = row.action;
+          }
+    
+          return {
+            actor: row.actor_name,
+            action: row.action,
+            message,
+            createdAt: row.timestamp
+          };
+        });
+    
+        res.json(activities);
+      } catch (err) {
+        console.error(err);
+        res.status(500).json({ error: err.message });
+      }
+    }
+  
+   async stats(req,res){
+        try {
+          const partyId = req.user.id
+      
+          // Total candidates for this party
+          const { rows: candidates } = await pool.query(`
+            SELECT COUNT(*) AS total
+            FROM candidate
+            WHERE partyid = $1
+          `, [partyId]);
+      
+          // Active elections
+          const { rows: activeElections } = await pool.query(`
+            SELECT COUNT(*) AS total
+            FROM elections
+            WHERE status = 'Active'
+          `);
+      
+          // Allocated seats (all seats assigned to this party)
+          const { rows: allocatedSeats } = await pool.query(`
+            SELECT COUNT(*) AS total
+            FROM candidateconstituency
+            WHERE candidateid IN (
+              SELECT id FROM candidate WHERE partyid = $1
+            )
+          `, [partyId]);
+      
+          // Won seats
+          const { rows: wonSeats } = await pool.query(`
+            SELECT COUNT(*) AS total
+            FROM candidateconstituency
+            WHERE candidateid IN (
+              SELECT id FROM candidate WHERE partyid = $1
+            )
+            AND approvalstatus = 'Won'
+          `, [partyId]);
+      
+          res.json({
+            totalCandidates: parseInt(candidates[0].total, 10),
+            activeElections: parseInt(activeElections[0].total, 10),
+            allocatedSeats: parseInt(allocatedSeats[0].total, 10),
+            wonSeats: parseInt(wonSeats[0].total, 10)
+          });
+        } catch (err) {
+          console.error(err);
+          res.status(500).json({ error: err.message });
+        }
+      }
+  }
+
 
 export default new Parties();

@@ -10,7 +10,7 @@ import UserM from '../models/userM.js';
 import votesM from "../models/votesM.js";
 import constituencyArea from "./constituencyArea.js";
 import auditLogsM from "./auditLogsM.js";
-const admin=[
+export const admin=[
     { name: "Sufyan", email: "admin@vote.com", password: "admin123", cnic: "00000-0000000-0", province: "Sindh", city: "Karachi", area: "Clifton" },
   { name: "Ammar", email: "officer@vote.com", password: "secure123", cnic: "11111-1111111-1", province: "Punjab", city: "Lahore", area: "Gulberg" },
   { name: "Moiz", email: "sufyanali05.work@gmail.com", password: "secure123", cnic: "11111-11211-1", province: "Punjab", city: "Lahore", area: "Gulberg" }

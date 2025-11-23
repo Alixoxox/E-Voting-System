@@ -7,6 +7,8 @@ import { redisClient } from "../server.js";
 import partyM from "../models/partyM.js";
 import candConstM from "../models/candConstM.js";
 import ConstituencyM from "../models/ConstituencyM.js";
+import { admin } from "../models/initializer.js";
+import { runAutoSeatChooser, runDailyElectionCheck } from "../utils/Services.js";
 dotenv.config(); // loads variables from .env into process.env
 
 const SECRET_KEY = process.env.SECRET_KEY;
@@ -156,5 +158,73 @@ async publishElectionResults(req, res) {
           res.status(500).json({ error: err.message });
         }
       }
-}
+      async getRecentActivity(req,res){
+          try {
+            // Step 1: Extract admin names
+            const adminNames = admin.map(a => a.name); // ["Sufyan","Ammar","Moiz"]
+        
+            // Step 2: Query audit_logs for admin or system actions
+            const { rows } = await pool.query(`
+              SELECT actor_name, action, details, timestamp
+              FROM audit_logs
+              WHERE actor_name = ANY($1::text[]) OR actor_name = 'SYSTEM'
+              ORDER BY timestamp DESC
+              LIMIT 20
+            `, [adminNames]);
+        
+            // Step 3: Map and format messages
+            const activities = rows.map(row => {
+              const d = row.details ? JSON.parse(row.details) : {};
+              let message = "";
+        
+              switch (row.action) {
+                case "CREATE_ELECTION":
+                  message = `New election created: ${d.name || "Unknown"}`;
+                  break;
+                case "PROVINCES_CSV_UPLOAD":
+                case "PARTY_CSV_UPLOAD":
+                  message = `${row.actor_name} uploaded CSV: ${d.rowsAdded || 0} rows`;
+                  break;
+                case "PARTY_REGISTERED":
+                  message = `${d.partyName} registered (${d.status})`;
+                  break;
+                default:
+                  message = row.action;
+              }
+        
+              return {
+                actor: row.actor_name,
+                message,
+                timestamp: row.timestamp
+              };
+            });
+        
+            res.json(activities);
+        
+          } catch (err) {
+            console.error(err);
+            res.status(500).json({ error: err.message });
+          }
+        }
+        async EndEllections(req,res){
+          const electionId = req.params.id;
+        
+          try {
+            // Optional: set end_date to NOW() and leave status Active
+            await db.query(`UPDATE elections SET end_date = NOW() WHERE id = $1`, [electionId]);
+        
+            // 1️⃣ Run daily election check (calculates winners)
+            await runDailyElectionCheck();
+        
+            // 2️⃣ Run auto seat chooser (handles multi-seat logic)
+            await runAutoSeatChooser();
+        
+            res.json({ message: `Election ${electionId} ended and processed successfully.` });
+          } catch (err) {
+            console.error(err);
+            res.status(500).json({ error: err.message });
+          }
+        }
+      }
+
 export default new adminC();

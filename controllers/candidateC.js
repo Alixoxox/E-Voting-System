@@ -32,18 +32,7 @@ class CandiateC {
   getCandidatesByPartyId = async (req, res) => {
     try {
       const partyId = req.user.id;
-      if (redisClient.exists(`getCandidatesByPartyId:${partyId}`)) {
-        let cachedResults = await redisClient.get(
-          `getCandidatesByPartyId:${partyId}`
-        );
-        return res.json(JSON.parse(cachedResults));
-      }
       const candidates = await candidateM.getCandidatesByPartyId(partyId);
-      await redisClient.setEx(
-        `getCandidatesByPartyId:${partyId}`,
-        3600,
-        JSON.stringify(candidates)
-      );
       return res.json(candidates);
     } catch (err) {
       console.error(err);

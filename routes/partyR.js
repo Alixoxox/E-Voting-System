@@ -6,6 +6,8 @@ import candidateConstituencyC from '../controllers/candConstC.js';
 import { authenicator } from '../middleware/authenicator.js';
 const router = express.Router();
 import { upload } from '../utils/imgUloader.js'; // or wherever your file is
+import pool from '../config/db.js';
+import partyC from '../controllers/partyC.js';
 
 /**
  * @swagger
@@ -343,4 +345,96 @@ router.get('/candidates/:candidateId/won/seats',authenicator ,candidateConstitue
 
 router.post('/candidate/choose/seat',authenicator ,candidateConstituencyC.ChooseSeat);
 
-export default router;
+/**
+ * @swagger
+ * /api/parties/stats:
+ *   get:
+ *     summary: Get party dashboard statistics
+ *     tags: [Parties]
+ *     responses:
+ *       200:
+ *         description: Returns stats for the logged-in party
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 totalCandidates:
+ *                   type: integer
+ *                   example: 2
+ *                 activeElections:
+ *                   type: integer
+ *                   example: 1
+ *                 allocatedSeats:
+ *                   type: integer
+ *                   example: 1
+ *                 wonSeats:
+ *                   type: integer
+ *                   example: 1
+ *       500:
+ *         description: Server error
+ */
+
+
+router.get("/stats", authenicator, partyC.stats);
+  /**
+ * @swagger
+ * /api/parties/recent-activity:
+ *   get:
+ *     summary: Get recent activity for a party
+ *     tags: [Parties]
+ *     responses:
+ *       200:
+ *         description: Recent activity events
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: array
+ *               items:
+ *                 type: object
+ *                 properties:
+ *                   actor:
+ *                     type: string
+ *                   action:
+ *                     type: string
+ *                   details:
+ *                     type: object
+ *                   createdAt:
+ *                     type: string
+ */
+  router.get("/recent-activity", authenicator, partyC.getRecentActivity);
+
+
+
+/**
+ * @swagger
+ * /api/parties/candidates/won-seats:
+ *   get:
+ *     summary: Get all winning seats of the logged-in party's candidates
+ *     tags: [Parties]
+ *     responses:
+ *       200:
+ *         description: Winning seats retrieved
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 message:
+ *                   type: string
+ *                   example: "Won seats retrieved successfully"
+ *                 seats:
+ *                   type: array
+ *                   items:
+ *                     type: object
+ *                     properties:
+ *                       seat_id: { type: integer }
+ *                       constituencyid: { type: integer }
+ *                       constituency_name: { type: string }
+ *                       election_name: { type: string }
+ *                       totalvotes: { type: integer }
+ *       401: { description: Unauthorized }
+ *       500: { description: Failed to fetch winning seats }
+ */
+router.get('/candidates/won-seats', authenicator, candidateConstituencyC.GetPartyWonSeats); 
+ export default router;

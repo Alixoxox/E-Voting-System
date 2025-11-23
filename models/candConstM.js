@@ -141,6 +141,41 @@ class candConstM {
         throw new Error (err.message||"Error fetching won seats" );
       }
     }
-    
+    async getPartyWonSeats(partyId) {
+      try {
+        console.log(partyId)
+          // Find the top vote-getter (the winner) in each constituency for each finalized election.
+          const { rows } = await db.query(`
+             SELECT 
+  cc.id AS seat_id,
+  cc.constituencyid,
+  c.name AS constituency_name,
+  e.name AS election_name,
+  cc.totalvotes,
+  u.id AS candidate_id,
+  u.name AS candidate_name
+FROM candidateconstituency cc
+JOIN candidate cand ON cand.id = cc.candidateid
+JOIN users u ON u.id = cand.userid
+JOIN constituency c ON c.id = cc.constituencyid
+JOIN elections e ON e.id = cc.electionid
+WHERE cand.partyid = $1
+  AND cc.approvalstatus = 'Won'
+  AND e.status = 'Ended'
+  AND e.finalized = true
+ORDER BY e.id, c.id;
+          `, [partyId]);
+      
+          if (!rows.length) throw new Error("No winning seats for this party.");
+      
+          return {
+              message: "Party's candidates won seats retrieved successfully",
+              seats: rows
+          };
+      } catch (err) {
+          console.error("Error fetching party won seats:", err);
+          throw new Error(err.message || "Error fetching party won seats");
+      }
+  }
 }
 export default new candConstM();
