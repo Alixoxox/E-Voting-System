@@ -76,29 +76,37 @@ class partyM{
         await db.query(`UPDATE party SET approvalStatus = 'Approved' WHERE id = $1`, [id]);
       }
       async LoginParty(email, password){
-        try{
-           const result= await db.query(`SELECT * FROM party WHERE email = $1`, [email]);
-            if(result.rows.length === 0){
-              throw new Error('Party not found');
-            }
-            const party = result.rows[0];
-            if (party.approvalstatus === 'Pending') {
-              throw new Error('Account not verified. Please verify your email.');
-            }
-            if (party.approvalstatus === 'Rejected') {
-              throw new Error('Your account has been rejected by the admin.');
-            }
-            console.log('Comparing passwords:', password, party.password);
-            let isMatch = await bcrypt.compare(password, party.password);
-            if(!isMatch){
-              throw new Error('Invalid password');
-            }
-            return party;
-        }catch(err){
+        try {
+          const result = await db.query(`SELECT * FROM party WHERE email = $1`, [email]);
+          if(result.rows.length === 0){
+            throw new Error('Party not found');
+          }
+      
+          const party = result.rows[0];
+      
+          if (party.approvalstatus === 'Pending') {
+            const err = new Error('Account not verified. Please verify your email.');
+            err.userId = party.id;  
+            throw err;           
+          }
+      
+          if (party.approvalstatus === 'Rejected') {
+            throw new Error('Your account has been rejected by the admin.');
+          }
+      
+          console.log('Comparing passwords:', password, party.password);
+          let isMatch = await bcrypt.compare(password, party.password);
+          if(!isMatch){
+            throw new Error('Invalid password');
+          }
+      
+          return party;
+      
+        } catch(err) {
           console.error('Error logging in party:', err);
-          throw new Error(err.message || 'Error logging in party');
+          throw err; // keep original error with attached userId
         }
-}
+      }
 async getAllPartiesWithCandidates(page = 1, limit = 10) {
   try {
     const offset = (page - 1) * limit;

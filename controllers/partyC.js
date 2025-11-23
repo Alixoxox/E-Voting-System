@@ -89,8 +89,13 @@ class Parties {
       return res.json({ message: "Party logged in successfully",PartyData,token });
     } catch (err) {
       console.error(err);
-      await auditLogsM.logAction(req,'PARTY_LOGIN_FAILED','PARTY_LOGIN_FAILED',{email:req.body.email,error:err.message,status: 'Error'});
-      return res.status(500).json({ error: err.message||"Failed to login party" });
+      await auditLogsM.logAction( req,'PARTY_LOGIN_FAILED','PARTY_LOGIN_FAILED',{ email: req.body.email, error: err.message, status: 'Error' });
+      // Send userId back if present
+      if (err.userId) {
+        return res.status(400).json({ error: err.message, userId: err.userId, areaId: err.areaId });
+      }
+    
+      return res.status(500).json({ error: err.message || "Failed to login party" });
     }
   }
   async RejectPartyRegistration(req, res) {

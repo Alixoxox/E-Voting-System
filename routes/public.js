@@ -118,6 +118,8 @@ router.get('/cities', cityC.getCities);
  *                 type: string
  *               type:
  *                 type: string
+ *                 enum: ["party", "user"]
+ *                 example: "party"
  *     responses:
  *       200:
  *         description: OTP sent to email
