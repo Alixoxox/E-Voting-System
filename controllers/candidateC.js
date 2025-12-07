@@ -139,34 +139,17 @@ class CandiateC {
     try {
       console.log("Kicking candidate with ID:", candidateId);
       // 1. Delete all votes referencing this candidate (via candidateConstId)
-      await pool.query(
-        `DELETE FROM votes 
-         WHERE candidateConstId IN (
-           SELECT id FROM candidateconstituency WHERE candidateId = $1
-         )`,
-        [candidateId]
-      );
-  
-      // 2. Delete candidate constituency mapping
-      await pool.query(
-        `DELETE FROM candidateconstituency WHERE candidateId = $1`,
-        [candidateId]
-      );
-  
-      // 3. Delete candidate itself
-      await pool.query(
-        `DELETE FROM candidate WHERE id = $1`,
-        [candidateId]
-      );
+      await candidateM.kickCandidate(candidateId);
       await auditLogsM.logAction(
-        null,
+        req,
         "CANDIDATE_REMOVED",
-        "Candidate_" + candidateId,
+        `Party_${req.user.id}`, 
         {
-          msg: "Candidate removed successfully",
-          status: "Success",
+            msg: `Removed candidate (ID: ${candidateId}) and deleted their user account.`,
+            candidateId: candidateId,
+            status: "Success",
         }
-      );
+    );
       return res.json({ message: "Candidate removed successfully" });
       
     } catch (err) {

@@ -42,24 +42,114 @@ class candConstM {
       console.error("Error fetching party candidates in constituency for election:", err);
       throw new Error("Error fetching party candidates in constituency for election") ;}
   }
-  async allocateCandidateEllectionConst(
-    candidateId,
-    electionId,
-    constituencyId
-  ) {
+  async getCandidateAllocations(candidateId) {
     try {
-      const sql = `INSERT INTO candidateConstituency (candidateId, electionId, constituencyId) VALUES ($1, $2, $3);`;
-      await db.query(sql, [candidateId, electionId, constituencyId]);
+        const sql = `
+            SELECT 
+                cc.id,
+                e.name as election_name,
+                e.seatType,
+                e.status as election_status,
+                con.name as constituency_name,
+                con.code as constituency_code,
+                cc.approvalStatus
+            FROM candidateConstituency cc
+            JOIN elections e ON cc.electionId = e.id
+            JOIN constituency con ON cc.constituencyId = con.id
+            WHERE cc.candidateId = $1
+            ORDER BY e.startDate DESC;
+        `;
+        const result = await db.query(sql, [candidateId]);
+        return result.rows;
     } catch (err) {
-      if (err.code === "23503") {
-        throw new Error("This constituency or election does not exist");
-      } else if (err.code === "23505") {
-        throw new Error(
-          "Candidate is already allocated to this constituency for the election"
-        );
-      }
+        console.error("Error fetching candidate allocations:", err);
+        throw new Error("Error fetching candidate allocations");
     }
-  }
+}
+  async allocateCandidateEllectionConst(candidateId, electionId, constituencyId) {
+    try {
+        // 1. Fetch Election Details
+        const electionRes = await db.query(
+            `SELECT seatType, provinceId FROM elections WHERE id = $1`,
+            [electionId]
+        );
+
+        if (electionRes.rows.length === 0) throw new Error("Election not found");
+
+        const { seattype, provinceid: electionProvinceId } = electionRes.rows[0];
+
+        // ======================================================
+        // LOGIC: PROVINCIAL ELECTIONS
+        // ======================================================
+        if (seattype === 'Provincial') {
+            
+            // --- A. Validate CANDIDATE's Province ---
+            const candidateRes = await db.query(
+                `SELECT u.provinceId 
+                 FROM candidate c 
+                 JOIN users u ON c.userId = u.id 
+                 WHERE c.id = $1`,
+                [candidateId]
+            );
+
+            if (candidateRes.rows.length === 0) throw new Error("Candidate user not found");
+            
+            const candidateProvinceId = candidateRes.rows[0].provinceid;
+
+            if (candidateProvinceId !== electionProvinceId) {
+                throw new Error("Candidate is not eligible: You can only contest provincial elections in your home province.");
+            }
+
+            // --- B. Validate CONSTITUENCY'S Province (The Fix) ---
+            // We join Constituency -> Constituency_Area -> Area -> City -> Province
+            const constituencyRes = await db.query(
+                `SELECT ci.provinceId
+                 FROM constituency c
+                 JOIN constituency_area ca ON c.id = ca.constituencyid
+                 JOIN area a ON ca.areaid = a.id
+                 JOIN city ci ON a.cityid = ci.id
+                 WHERE c.id = $1
+                 LIMIT 1`, 
+                 [constituencyId]
+            );
+
+            if (constituencyRes.rows.length === 0) {
+                // If no rows, it means the constituency has no areas assigned yet, 
+                // OR the constituency ID is wrong.
+                throw new Error("Invalid Constituency: It has no mapped areas or does not exist.");
+            }
+
+            const constProvinceId = constituencyRes.rows[0].provinceid;
+
+            if (constProvinceId !== electionProvinceId) {
+                throw new Error("Invalid Constituency: This constituency does not belong to the province of this election.");
+            }
+        }
+
+        // ======================================================
+        // LOGIC: NATIONAL ELECTIONS
+        // ======================================================
+        // If National, we skipped the block above.
+        // We allow the candidate to fight for ANY constituency.
+        // However, we should still ensure the constituency exists.
+        
+        // 3. Final Insert
+        const sql = `INSERT INTO candidateConstituency (candidateId, electionId, constituencyId) VALUES ($1, $2, $3);`;
+        await db.query(sql, [candidateId, electionId, constituencyId]);
+
+    } catch (err) {
+        // Handle constraint errors or custom errors
+        if (err.message.includes("Candidate is not eligible") || err.message.includes("Invalid Constituency")) {
+            throw err; // Throw our custom validation errors
+        }
+        if (err.code === "23503") {
+            throw new Error("Reference error: Data provided does not exist.");
+        } else if (err.code === "23505") {
+            throw new Error("Candidate is already allocated to this constituency for this election.");
+        }
+        throw err;
+    }
+}
   async chooseSeat(candidateId,electionId,constituencyId) {
 
     try {
@@ -143,37 +233,31 @@ class candConstM {
     }
     async getPartyWonSeats(partyId) {
       try {
-        console.log(partyId)
-          // Find the top vote-getter (the winner) in each constituency for each finalized election.
           const { rows } = await db.query(`
-             SELECT 
-  cc.id AS seat_id,
-  cc.constituencyid,
-  c.name AS constituency_name,
-  e.name AS election_name,
-  cc.totalvotes,
-  u.id AS candidate_id,
-  u.name AS candidate_name
-FROM candidateconstituency cc
-JOIN candidate cand ON cand.id = cc.candidateid
-JOIN users u ON u.id = cand.userid
-JOIN constituency c ON c.id = cc.constituencyid
-JOIN elections e ON e.id = cc.electionid
-WHERE cand.partyid = $1
-  AND cc.approvalstatus = 'Won'
-  AND e.status = 'Ended'
-  AND e.finalized = true
-ORDER BY e.id, c.id;
+              SELECT 
+                  cc.id AS seat_id,
+                  cc.constituencyid,
+                  c.name AS constituency_name,
+                  e.name AS election_name,
+                  cc.totalvotes,
+                  u.id AS candidate_id,
+                  u.name AS candidate_name
+              FROM candidateconstituency cc
+              JOIN candidate cand ON cand.id = cc.candidateid
+              JOIN users u ON u.id = cand.userid
+              JOIN constituency c ON c.id = cc.constituencyid
+              JOIN elections e ON e.id = cc.electionid
+              WHERE cand.partyid = $1
+                AND cc.approvalstatus = 'Won'
+                AND e.status = 'Ended'
+                AND e.finalized = true
+              ORDER BY e.id, c.id;
           `, [partyId]);
-      
-          if (!rows.length) throw new Error("No winning seats for this party.");
-      
-          return {
-              message: "Party's candidates won seats retrieved successfully",
-              seats: rows
-          };
+  
+          // FIX: Return empty array if no rows, don't throw error or return message object
+          return rows; 
+  
       } catch (err) {
-          console.error("Error fetching party won seats:", err);
           throw new Error(err.message || "Error fetching party won seats");
       }
   }

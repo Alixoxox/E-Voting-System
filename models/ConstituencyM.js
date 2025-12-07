@@ -21,8 +21,22 @@ class ConstituencyM{
     }
     async getAllConstituencies(){
         try{
-            const sql=`SELECT * FROM Constituency;`
+            const sql=`SELECT DISTINCT ON (c.id)
+            c.id, 
+            c.name, 
+            c.code, 
+            c.seatType, 
+            c.status,
+            ci.id as "cityId",       
+            ci.name as "cityName",
+            ci.provinceId as "provinceId"
+        FROM constituency c
+        LEFT JOIN constituency_area ca ON c.id = ca.constituencyid
+        LEFT JOIN area a ON ca.areaid = a.id
+        LEFT JOIN city ci ON a.cityid = ci.id
+        ORDER BY c.id ASC;`
             const result=await db.query(sql);
+            console.log('Fetched Constituencies:', result.rows);
             return result.rows;
         }catch(err){
             console.error('Error fetching Constituencies:', err);

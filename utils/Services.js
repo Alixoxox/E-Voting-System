@@ -1,7 +1,7 @@
-
 import db from "../config/db.js";
 import auditLogsM from "../models/auditLogsM.js";
 
+// Logic to handle multi-seat logic (if a candidate wins multiple seats)
 export async function runAutoSeatChooser() {
   console.log("🕐 Running auto seat chooser...");
 
@@ -14,7 +14,7 @@ export async function runAutoSeatChooser() {
     for (const election of elections) {
       const electionId = election.id;
 
-      // Multi-seat winners logic...
+      // Check for candidates who won multiple seats
       const { rows: multiWinners } = await db.query(`
         SELECT candidateid 
         FROM candidateconstituency 
@@ -24,6 +24,7 @@ export async function runAutoSeatChooser() {
       `, [electionId]);
 
       for (const { candidateid } of multiWinners) {
+        // Keep the seat with the highest votes, drop others
         const { rows: topSeat } = await db.query(`
           SELECT id, constituencyid 
           FROM candidateconstituency 
@@ -58,6 +59,7 @@ export async function runAutoSeatChooser() {
           );
         }
 
+        // Promote Runner-ups in dropped constituencies
         for (const seat of droppedSeats) {
           const { constituencyid } = seat;
           const { rows: runnerUp } = await db.query(`
@@ -88,34 +90,38 @@ export async function runAutoSeatChooser() {
       }
 
       await db.query(`UPDATE elections SET finalized = TRUE WHERE id = $1`, [electionId]);
-
-      await auditLogsM.logAction(
-        null,
-        "AUTO_SEAT_ASSIGNMENT_COMPLETED",
-        `Election_${electionId}`,
-        { status: "Success" }
-      );
-
       console.log(`✅ Auto seat assignment completed for election ${electionId}`);
     }
   } catch (err) {
-    await auditLogsM.logAction(null, "AUTO_SEAT_ASSIGNMENT_FAILED", "SYSTEM", { error: err.message });
     console.error("❌ Error in auto seat chooser:", err);
   }
 }
 
+// Logic to calculate winners based on Votes
 export async function runDailyElectionCheck() {
   console.log('🌅 Running daily election result check...');
 
   try {
+    // 1. Get elections that have ended (date passed) or are being manually ended
     const { rows: endedElections } = await db.query(`
       SELECT id FROM elections
-      WHERE end_date <= NOW() AND status = 'Active'
+      WHERE (end_date <= NOW() AND status = 'Active') 
+         OR (status = 'Active' AND id IN (SELECT id FROM elections WHERE status = 'Ended'))
     `);
 
-    for (const election of endedElections) {
+    // Note: The manual trigger in adminC sets status to 'Ended' before calling this, 
+    // so we just need to process 'Active' ones that timed out, OR handle the logic manually.
+    // However, usually manual end sets end_date to NOW().
+
+    // Let's check for any Active election that SHOULD be ended.
+    const { rows: processableElections } = await db.query(`
+        SELECT id FROM elections WHERE end_date <= NOW() AND status = 'Active'
+    `);
+
+    for (const election of processableElections) {
       const electionId = election.id;
 
+      // 2. Fetch results: Ordered by Constituency, then Votes DESC
       const { rows: results } = await db.query(`
         SELECT candidateid, constituencyid, totalvotes
         FROM candidateconstituency
@@ -124,12 +130,15 @@ export async function runDailyElectionCheck() {
       `, [electionId]);
 
       const topWinners = new Map();
+      
+      // 3. Pick the winner (first row per constituency is the highest vote getter)
       for (const row of results) {
         if (!topWinners.has(row.constituencyid)) {
           topWinners.set(row.constituencyid, row);
         }
       }
 
+      // 4. Update Winners
       for (const winner of topWinners.values()) {
         await db.query(`
           UPDATE candidateconstituency
@@ -138,12 +147,14 @@ export async function runDailyElectionCheck() {
         `, [winner.candidateid, winner.constituencyid, electionId]);
       }
 
+      // 5. Update Losers
       await db.query(`
         UPDATE candidateconstituency
         SET approvalStatus = 'Lost'
         WHERE electionid = $1 AND approvalStatus IS DISTINCT FROM 'Won'
       `, [electionId]);
 
+      // 6. Close Election
       await db.query(`
         UPDATE elections SET status = 'Ended'
         WHERE id = $1
@@ -153,21 +164,12 @@ export async function runDailyElectionCheck() {
         null,
         'ELECTION_RESULTS_DECLARED',
         `Election_${electionId}`,
-        {
-          status: 'Success',
-          winnersCount: topWinners.size,
-        }
+        { status: 'Success', winnersCount: topWinners.size }
       );
 
       console.log(`✅ Declared results for election ${electionId}`);
     }
   } catch (err) {
-    await auditLogsM.logAction(
-      null,
-      'DAILY_RESULT_CHECK_FAILED',
-      'SYSTEM',
-      { error: err.message, status: 'Error' }
-    );
     console.error('❌ Error running daily election result check:', err);
   }
 }

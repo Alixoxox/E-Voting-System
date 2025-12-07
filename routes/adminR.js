@@ -5,13 +5,14 @@ import AreasC from '../controllers/areaC.js';
 import multer from 'multer';
 import ProvinceC from '../controllers/ProvinceC.js';
 import ConstituencyC from '../controllers/ConstituencyC.js';
-import Parties from '../controllers/partyC.js';
+import partyC from '../controllers/partyC.js'; // standardized import
 import userC from '../controllers/userC.js';
 import { authenicator } from '../middleware/authenicator.js';
 import adminC from '../controllers/adminC.js';
-import partyC from '../controllers/partyC.js';
+import CandidateC from '../controllers/candidateC.js';
+
 const router = express.Router();
-const upload = multer({ dest: 'uploads/' }); // temporary storage
+const upload = multer({ dest: 'uploads/' });
 
 /**
  * @swagger
@@ -19,548 +20,73 @@ const upload = multer({ dest: 'uploads/' }); // temporary storage
  *   name: Admin
  *   description: Admin management endpoints
  */
+
+// Parties
 /**
  * @swagger
- * /api/admin/fetch/users:
+ * /api/admin/parties:
  *   get:
- *     summary: Get registered users (paginated)
+ *     summary: Get all parties (Admin View)
  *     tags: [Admin]
- *     parameters:
- *       - in: query
- *         name: page
- *         schema: { type: integer, default: 1 }
- *       - in: query
- *         name: limit
- *         schema: { type: integer, default: 10 }
- *     responses:
- *       200: { description: Users retrieved successfully }
- *       500: { description: Server error }
  */
-router.get('/fetch/users', authenicator,userC.fetchUsers);
+router.get('/parties', authenicator, partyC.getParties);
 
+// Candidates
 /**
  * @swagger
- * /api/admin/area/upload-csv:
- *   post:
- *     summary: Upload areas via CSV file
+ * /api/admin/candidates:
+ *   get:
+ *     summary: Get all candidates (Admin View)
  *     tags: [Admin]
- *     requestBody:
- *       required: true
- *       content:
- *         multipart/form-data:
- *           schema:
- *             type: object
- *             properties:
- *               file:
- *                 type: string
- *                 format: binary
- *                 description: CSV file containing area data (name , city)
- *     responses:
- *       200:
- *         description: Areas uploaded successfully
- *         content:
- *           application/json:
- *             schema:
- *               type: object
- *               properties:
- *                 message:
- *                   type: string
- *                 inserted:
- *                   type: integer
- *       400:
- *         description: Bad request - Invalid file or format
- *       500:
- *         description: Server error
  */
-router.post('/area/upload-csv',authenicator, upload.single('file'), AreasC.AddAreasCsv);
+router.get('/candidates', authenicator, CandidateC.getCandidates);
 
+// Users
+router.get('/fetch/users', authenicator, userC.fetchUsers);
 
-/**
- * @swagger
- * /api/admin/cities/upload-csv:
- *   post:
- *     summary: Upload cities via CSV file
- *     tags: [Admin]
- *     requestBody:
- *       required: true
- *       content:
- *         multipart/form-data:
- *           schema:
- *             type: object
- *             properties:
- *               file:
- *                 type: string
- *                 format: binary
- *                 description: CSV file containing city data (name, province)
- *     responses:
- *       200:
- *         description: Cities uploaded successfully
- *         content:
- *           application/json:
- *             schema:
- *               type: object
- *               properties:
- *                 message:
- *                   type: string
- *                 inserted:
- *                   type: integer
- *       400:
- *         description: Bad request - Invalid file or format
- *       500:
- *         description: Server error
- */
-router.post('/cities/upload-csv',authenicator, upload.single('file'), cityC.AddCitycsv);
+// Areas CSV Upload
+router.post('/area/upload-csv', authenicator, upload.single('file'), AreasC.AddAreasCsv);
 
-/**
- * @swagger
- * /api/admin/elections/addSession:
- *   post:
- *     summary: Add a new election session
- *     tags: [Admin]
- *     requestBody:
- *       required: true
- *       content:
- *         application/json:
- *           schema:
- *             type: object
- *             required: [name, startDate, endDate, seatType, Province]
- *             properties:
- *               name: { type: string, example: "General Elections 2025" }
- *               startDate: { type: string, format: date, example: "2025-11-01" }
- *               endDate: { type: string, format: date, example: "2025-11-15" }
- *               seatType: { type: string, enum: [National, Provincial], example: "National" }
- *               Province: { type: string, example: "Sindh" }
- *     responses:
- *       200: { description: Election session added successfully }
- *       400: { description: Bad request - missing or invalid fields }
- *       500: { description: Server error }
- */
-router.post("/elections/addSession",authenicator,ElectionC.CreateEllection);
+// Cities CSV Upload
+router.post('/cities/upload-csv', authenicator, upload.single('file'), cityC.AddCitycsv);
 
-/**
- * @swagger
- * /api/admin/province/upload-csv:
- *   post:
- *     summary: Upload provinces via CSV file
- *     tags: [Admin]
- *     requestBody:
- *       required: true
- *       content:
- *         multipart/form-data:
- *           schema:
- *             type: object
- *             properties:
- *               file:
- *                 type: string
- *                 format: binary
- *                 description: CSV file containing province data (name)
- *     responses:
- *       200:
- *         description: Provinces uploaded successfully
- *         content:
- *           application/json:
- *             schema:
- *               type: object
- *               properties:
- *                 message:
- *                   type: string
- *       400:
- *         description: Bad request - Invalid file or format
- *       500:
- *         description: Server error
- */
-router.post('/province/upload-csv',authenicator, upload.single('file'), ProvinceC.AddProvincesCsv);
+// Elections Session
+router.post("/elections/addSession", authenicator, ElectionC.CreateEllection);
 
-/**
- * @swagger
- * /api/admin/constituencies/upload-csv:
- *   post:
- *     summary: Upload constituencies via CSV file
- *     tags: [Admin]
- *     requestBody:
- *       required: true
- *       content:
- *         multipart/form-data:
- *           schema:
- *             type: object
- *             properties:
- *               file:
- *                 type: string
- *                 format: binary
- *                 description: CSV file containing constituencies data (code , name, seatType, areas)
- *     responses:
- *       200:
- *         description: Constituencies uploaded successfully
- *         content:
- *           application/json:
- *             schema:
- *               type: object
- *               properties:
- *                 message:
- *                   type: string
- *                 inserted:
- *                   type: integer
- *       400:
- *         description: Bad request - Invalid file or format
- *       500:
- *         description: Server error
- */
-router.post('/constituencies/upload-csv',authenicator,upload.single('file'), ConstituencyC.addConstituency);
-/**
- * @swagger
- * /api/admin/party/upload-csv:
- *   post:
- *     summary: Upload political parties via CSV file
- *     tags: [Admin]
- *     requestBody:
- *       required: true
- *       content:
- *         multipart/form-data:
- *           schema:
- *             type: object
- *             properties:
- *               file:
- *                 type: string
- *                 format: binary
- *                 description: CSV file containing political party data (name, abbreviation, logo, email, password)
- *     responses:
- *       200:
- *         description: Parties uploaded successfully
- *         content:
- *           application/json:
- *             schema:
- *               type: object
- *               properties:
- *                 message:
- *                   type: string
- *                 inserted:
- *                   type: integer
- *       400:
- *         description: Bad request - Invalid file or CSV format
- *       500:
- *         description: Server error
- */
-router.post('/party/upload-csv',authenicator, upload.single('file'), Parties.AddPartiesCsv);
-/**
- * @swagger
- * /api/admin/auth/signin:
- *   post:
- *     summary: Admin Login
- *     tags: [Admin]
- *     requestBody:
- *       required: true
- *       content:
- *         application/json:
- *           schema:
- *             type: object
- *             required: [email, password, cnic]
- *             properties:
- *               email:
- *                 type: string
- *                 format: email
- *                 example: "admin@vote.com"
- *               password:
- *                 type: string
- *                 format: password
- *                 example: "admin123"
- *               cnic:
- *                 type: string
- *                 example: "00000-0000000-0"
- *     responses:
- *       200:
- *         description: Login successful
- *         content:
- *           application/json:
- *             schema:
- *               type: object
- *               properties:
- *                 message:
- *                   type: string
- *                 token:
- *                   type: string
- *                 UserData:
- *                   type: object
- *       401:
- *         description: Invalid credentials or CNIC
- *       500:
- *         description: Server error
- */
+// Provinces CSV Upload
+router.post('/province/upload-csv', authenicator, upload.single('file'), ProvinceC.AddProvincesCsv);
+
+// Constituencies CSV Upload
+router.post('/constituencies/upload-csv', authenicator, upload.single('file'), ConstituencyC.addConstituency);
+
+// Parties CSV Upload
+router.post('/party/upload-csv', authenicator, upload.single('file'), partyC.AddPartiesCsv);
+
+// Admin Signin
 router.post('/auth/signin', adminC.adminSignin);
 
-
-/**
- * @swagger
- * /api/admin/auth/verify-mfa:
- *   post:
- *     summary: Admin Login Step 2 — Verify OTP
- *     tags: [Admin]
- *     requestBody:
- *       required: true
- *       content:
- *         application/json:
- *           schema:
- *             type: object
- *             required: [userId, otp]
- *             properties:
- *               userId:
- *                 type: integer
- *                 example: 1
- *               otp:
- *                 type: string
- *                 example: "999888"
- *     responses:
- *       200:
- *         description: Login successful, token issued
- *         content:
- *           application/json:
- *             schema:
- *               type: object
- *               properties:
- *                 token:
- *                   type: string
- *                 userData:
- *                   type: object
- *       401:
- *         description: Invalid OTP
- */
+// Admin Verify MFA
 router.post('/auth/verify-mfa', adminC.adminVerifyMFA);
 
-/**
- * @swagger
- * /api/admin/EditProfile:
- *   post:
- *     summary: Edit Admin profile
- *     tags: [Admin]
- *     security:
- *       - bearerAuth: []
- *     requestBody:
- *       required: true
- *       content:
- *         application/json:
- *           schema:
- *             type: object
- *             properties:
- *               name:
- *                 type: string
- *                 example: "John Doe"
- *               email:
- *                 type: string
- *                 format: email
- *                 example: "john@example.com"
- *               password:
- *                 type: string
- *                 format: password
- *                 example: "newPassword123"
- *             description: At least one field must be provided
- *     responses:
- *       200:
- *         description: Profile updated successfully
- *       400:
- *         description: No fields provided for update
- *       500:
- *         description: Server error
- */
+// Edit Profile
 router.post('/EditProfile', authenicator, userC.EditProfile);
 
-/**
- * @swagger
- * /api/admin/verify/integrity/{electionId}:
- *   get:
- *     summary: Verify Election Integrity (Blockchain Audit)
- *     description: Checks the cryptographic hash chain for a specific election to detect tampering.
- *     tags: [Admin]
- *     parameters:
- *       - in: path
- *         name: electionId
- *         required: true
- *         schema:
- *           type: integer
- *         description: ID of the election to verify
- *         example: 5
- *     responses:
- *       200:
- *         description: Verification result (Secure or Compromised)
- *         content:
- *           application/json:
- *             schema:
- *               type: object
- *               properties:
- *                 status:
- *                   type: string
- *                   enum: [Secure, Clean, Compromised]
- *                   example: "Secure"
- *                 message:
- *                   type: string
- *                   example: " Verification Passed. All hashes match."
- *                 details:
- *                   type: array
- *                   items:
- *                     type: object
- *                     properties:
- *                       brokenAtVoteID:
- *                         type: integer
- *                       expected:
- *                         type: string
- *                       found:
- *                         type: string
- *       500:
- *         description: Server error
- */
+// Verify Election Integrity
 router.get('/verify/integrity/:electionId', authenicator, ElectionC.verifyElectionIntegrity);
 
-// show audit logs to admin
-/**
- * @swagger
- * /api/admin/view/auditLogs:
- *   get:
- *     summary: Get paginated audit logs
- *     tags: [Admin]
- *     parameters:
- *       - in: query
- *         name: page
- *         schema:
- *           type: integer
- *           default: 1
- *         description: Page number
- *       - in: query
- *         name: limit
- *         schema:
- *           type: integer
- *           default: 10
- *         description: Number of logs per page
- *     responses:
- *       200:
- *         description: Paginated audit logs retrieved successfully
- *       500:
- *         description: Server error
- */
-router.get('/view/auditLogs',authenicator,adminC.FetchAuditLogs);
-/**
- * @swagger
- * /api/admin/dashboard/stats:
- *   get:
- *     summary: Get Command Center Stats
- *     tags: [Admin]
- *     responses: { 200: { description: "Stats object" } }
- */
-router.get('/dashboard/stats', authenicator, adminC.getDashboardStats);
+// Audit Logs
+router.get('/view/auditLogs', authenicator, adminC.FetchAuditLogs);
 
-/**
- * @swagger
- * /api/admin/parties/candidates/aggregated:
- *   get:
- *     summary: Get paginated parties with nested candidates [Parties with their respected candidates]
- *     tags: [Admin]
- *     parameters:
- *       - in: query
- *         name: page
- *         schema:
- *           type: integer
- *           default: 1
- *         description: Page number
- *       - in: query
- *         name: limit
- *         schema:
- *           type: integer
- *           default: 10
- *         description: Number of parties per page
- *     responses:
- *       200:
- *         description: Paginated list retrieved successfully
- *       500:
- *         description: Server error
- */
-router.get('/parties/candidates/aggregated', authenicator,adminC.fetchPartiesWithCandidates);
-/**
- * @swagger
- * /api/admin/reject/PartyRegistration/{partyId}:
- *   post:
- *     summary: Reject a party registration
- *     tags: [Admin]
- *     parameters:
- *       - in: path
- *         name: partyId
- *         required: true
- *         schema: { type: integer }
- *         description: ID of the party to reject
- *     responses:
- *       200: { description: Party registration rejected successfully }
- *       400: { description: Bad request }
- *       500: { description: Server error }
- */
-router.post('/reject/PartyRegistration/:partyId',authenicator ,partyC.RejectPartyRegistration)
+// Parties with Candidates
+router.get('/parties/candidates/aggregated', authenicator, adminC.fetchPartiesWithCandidates);
 
+// Reject Party Registration
+router.post('/reject/PartyRegistration/:partyId', authenicator, partyC.RejectPartyRegistration);
 
-/**
- * @swagger
- * /api/admin/end-election/{electionId}:
- *   post:
- *     summary: End an election and process results
- *     tags: [Admin]
- *     parameters:
- *       - in: path
- *         name: electionId
- *         required: true
- *         schema:
- *           type: integer
- *         description: Election ID
- *     responses:
- *       200:
- *         description: Election ended successfully
- *         content:
- *           application/json:
- *             example: { "message": "Election 5 ended and processed successfully." }
- *       500:
- *         description: Server error
- *         content:
- *           application/json:
- *             example: { "error": "Database connection failed" }
- */
-router.post('/end-election/:id',authenicator,adminC.EndEllections);
+// End Election
+router.post('/end-election/:id', authenicator, adminC.EndEllections);
 
-
-/**
- * @swagger
- * /api/admin/recent-activity:
- *   get:
- *     summary: Get recent system and admin activity
- *     description: Returns the 20 most recent actions performed by admins or the system. Parses audit log details into readable messages.
- *     tags: [Admin]
- *     responses:
- *       200:
- *         description: Recent activity fetched successfully
- *         content:
- *           application/json:
- *             schema:
- *               type: array
- *               items:
- *                 type: object
- *                 properties:
- *                   actor:
- *                     type: string
- *                     description: Name of the actor (admin or SYSTEM)
- *                     example: "Sufyan"
- *                   message:
- *                     type: string
- *                     description: Human-readable description of the action
- *                     example: "New election created: General Elections 2026"
- *                   timestamp:
- *                     type: string
- *                     format: date-time
- *                     description: When the action occurred
- *                     example: "2025-11-23T13:34:44.313Z"
- *       500:
- *         description: Failed to fetch recent activity
- *         content:
- *           application/json:
- *             schema:
- *               type: object
- *               properties:
- *                 error:
- *                   type: string
- *                   example: "Internal server error"
- */
-
+// Recent Activity
 router.get("/recent-activity", authenicator, adminC.getRecentActivity);
 
 export default router;

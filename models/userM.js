@@ -29,7 +29,7 @@ class UserM {
   async getAllUsers(page=1,limit=10) {
     try {
       const offset = (page - 1) * limit;
-      const sql = `SELECT id,name,email,role,created_at,cnic,is_verified FROM users ORDER BY created_at DESC LIMIT $1 OFFSET $2;`;
+      const sql = `SELECT id,name,email,role,created_at,cnic,is_verified FROM users where role='user' ORDER BY created_at DESC LIMIT $1 OFFSET $2;`;
       const result = await pool.query(sql,[limit,offset]);
       const totalResult = await pool.query(`SELECT COUNT(*) FROM users;`);
       const totalUsers = parseInt(totalResult.rows[0].count);
@@ -99,7 +99,7 @@ class UserM {
       throw err;
     }
   }
-async signinUser(email, password){
+async signinUser(email, password,role){
   const ATTEMPTS_KEY = `login:attempts:${email}`;
   const LOCK_KEY = `login:locked:${email}`;
   const MAX_ATTEMPTS = 5;
@@ -115,7 +115,7 @@ async signinUser(email, password){
     }
 
     // 2. Find User (Main DB)
-    const res = await pool.query(`SELECT id, name, email, password,is_verified,areaid,cnic FROM users WHERE email = $1`, [email]);
+    const res = await pool.query(`SELECT id, name, email, password,is_verified,areaid,cnic FROM users WHERE email = $1 and role = $2`, [email,role]);
     if (res.rows.length === 0) throw new Error('User not found');
     const user = res.rows[0];
     const isMatch = await bcrypt.compare(password, user.password);

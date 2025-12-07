@@ -44,7 +44,7 @@ createUser = async (req, res) => {
 signinUser = async (req, res) => {
   try{
     const {email, password} = req.body;
-    const result=await UserM.signinUser(email, password);
+    const result=await UserM.signinUser(email, password,'user');
     console.log(result)
     if(!result.is_verified){
       return res.status(403).json({error:'Please verify your email before signing in.',userId: result.id, areaid: result.areaid});
@@ -73,6 +73,7 @@ verifyAccount = async (req, res) => {
 //search from candidate constituency
 async viewCandidatesForUserElection(req,res){
   try{
+    console.log(req.user)
     const areaId=req.user.areaid;
     console.log('User Area ID:', areaId);
     if(!areaId){ throw new Error('Sorry You Are Not Eligible');}
@@ -156,6 +157,7 @@ async votingHistory(req, res) {
   const page= req.query.page || 1;
   try {
     let votingHistory = await votesM.votingHistory(userId,limit,page);
+    
     return res.json(votingHistory);
   } catch (err) {
     console.error("Error fetching voting history:", err);

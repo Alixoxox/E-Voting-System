@@ -48,54 +48,36 @@ ChooseSeat =async(req, res)=>{
 GetwonSeats=async(req, res)=>{
 try{
   const candidateId = Number(req.params.candidateId);
-  console.log(candidateId);
-  if(await redisClient.exists(`GetwonSeats:${candidateId}`)){
-    let cachedResults=await redisClient.get(`GetwonSeats:${candidateId}`)
-    return res.json(JSON.parse(cachedResults));
-  }
   const data=await candConstM.getWonSeats(candidateId);
   redisClient.setEx(`GetwonSeats:${candidateId}`,3600,JSON.stringify(data));
-  await auditLogsM.logAction(req,'FETCH_WON_SEATS' ,'Candidate_'+candidateId,{ msg: "Fetched won seats successfully" ,status: 'Success'});
   return res.json(data);
 }catch(err){
   console.error(err);
-  await auditLogsM.logAction(req,'FAILED_FETCH_WON_SEATS' ,'Candidate_'+req.params.candidateId,{ error:err.message||'Failed to fetch won seats' ,email:req.user.email,status: 'Error'});
   res.status(500).json({ error: err.message||'Failed to fetch won seats for candidate' });
 }
 }
-
-// Controller
 GetPartyWonSeats = async (req, res) => {
   try {
-    const partyId = req.user.id;
+      const partyId = req.user.id;
 
-    // Check Redis cache
-    if (await redisClient.exists(`PartyWonSeats:${partyId}`)) {
-      const cachedResults = await redisClient.get(`PartyWonSeats:${partyId}`);
-      return res.json(JSON.parse(cachedResults));
-    }
+      // 1. Check Cache
+      if (await redisClient.exists(`PartyWonSeats:${partyId}`)) {
+          const cached = await redisClient.get(`PartyWonSeats:${partyId}`);
+          return res.json(JSON.parse(cached));
+      }
 
-    // Fetch won seats for all candidates under this party
-    const data = await candConstM.getPartyWonSeats(partyId);
+      // 2. Fetch Data
+      const data = await candConstM.getPartyWonSeats(partyId); // Returns array (empty or populated)
 
-    // Cache results for 1 hour
-    await redisClient.setEx(`PartyWonSeats:${partyId}`, 3600, JSON.stringify(data));
+      // 3. Set Cache
+      await redisClient.setEx(`PartyWonSeats:${partyId}`, 3600, JSON.stringify(data));
 
-    // Log action
-    await auditLogsM.logAction(req, 'FETCH_WON_SEATS', `Party_${partyId}`, {
-      msg: "Fetched all candidates' won seats successfully",
-      status: 'Success'
-    });
+      return res.json(data);
 
-    return res.json(data);
   } catch (err) {
-    console.error(err);
-    await auditLogsM.logAction(req, 'FAILED_FETCH_WON_SEATS', `Party_${req.user.id}`, {
-      error: err.message || 'Failed to fetch won seats',
-      email: req.user.email,
-      status: 'Error'
-    });
-    res.status(500).json({ error: err.message || 'Failed to fetch won seats for party' });
+      console.error(err);
+      // IMPORTANT: Send 500 status on actual error
+      return res.status(500).json({ error: err.message || 'Failed to fetch won seats for party' });
   }
 };}
 export default new candidateConstituencyC();

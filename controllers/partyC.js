@@ -10,6 +10,7 @@ import parseCsvWithValidation from "../utils/parseCsv.js";
 import auditLogsM from "../models/auditLogsM.js";
 import userM from "../models/userM.js";
 import pool from "../config/db.js";
+import candConstM from "../models/candConstM.js";
 class Parties {
   getParties = async (req, res) => {
     try {
@@ -109,61 +110,91 @@ class Parties {
       auditLogsM.logAction(req,'PARTY_REGISTRATION_REJECTION_FAILED',`Party_${req.params.partyId}`,{error:err.message,status: 'Error'});
       return res.status(500).json({ error: err.message||"Failed to reject party registration" });
     }
-  }
-  async getRecentActivity(req, res) {
-      try {
-        const partyName = req.user.name;
-    
-        const { rows } = await pool.query(`
-          SELECT actor_name, action, details, timestamp
-          FROM audit_logs
-          WHERE details::json->>'partyName' = $1
-          ORDER BY timestamp DESC
-          LIMIT 20
-        `, [partyName]);
-    
-        const activities = rows.map(row => {
-          let message = "";
-          const d = row.details ? JSON.parse(row.details) : {};
-    
-          switch (row.action) {
-            case "PARTY_REGISTERED":
-              message = `${d.partyName} registered (${d.status})`;
-              break;
-            case "ADD_CANDIDATE":
-              message = `${d.email} added as candidate`;
-              break;
-            case "FAILED_ADD_CANDIDATE":
-              message = `Failed to add candidate: ${d.error}`;
-              break;
-            case "ALLOCATE_CANDIDATE_ELECTION_CONST":
-              message = `${d.msg} (Election ${d.electionId}, Constituency ${d.constituencyId})`;
-              break;
-            case "SEAT_ALLOCATED":
-              message = `Seat allocated: ${d.seat} - ${d.constituency}`;
-              break;
-            case "CANDIDATE_REMOVED":
-              message = `${d.msg}`;
-              break;
-            default:
-              message = row.action;
-          }
-    
-          return {
-            actor: row.actor_name,
-            action: row.action,
-            message,
-            createdAt: row.timestamp
-          };
-        });
-    
-        res.json(activities);
-      } catch (err) {
-        console.error(err);
-        res.status(500).json({ error: err.message });
-      }
+  }async getRecentActivity(req, res) {
+    try {
+      // 1. Use the Party Name from the token (e.g., "Sufi Pulse")
+      // Ensure your authenticator middleware adds 'name' to req.user
+      const partyName = req.user.name; 
+      const partyId = req.user.id;
+
+      // 2. Query: Fetch logs where Actor is Party Name OR Party ID (for flexibility)
+      const sql = `
+        SELECT actor_name, action, details, timestamp
+        FROM audit_logs
+        WHERE actor_name = $1 
+           OR target_id = $2 
+        ORDER BY timestamp DESC
+        LIMIT 20
+      `;
+
+      // We check both "Sufi Pulse" and "Party_9" formats to cover all bases
+      const { rows } = await pool.query(sql, [partyName, `Party_${partyId}`]);
+
+      const activities = rows.map(row => {
+        let message = "";
+        // Parse details safely
+        const d = typeof row.details === 'string' ? JSON.parse(row.details) : row.details || {};
+
+        switch (row.action) {
+          case "PARTY_REGISTERED":
+            message = `Party registered (${d.status || 'Pending'})`;
+            break;
+
+          case "ADD_CANDIDATE":
+            message = `Candidate added: ${d.email || 'Unknown'}`;
+            break;
+
+          case "ALLOCATE_CANDIDATE_ELECTION_CONST":
+            message = d.msg || "Allocated seat to candidate";
+            break;
+
+          case "CANDIDATE_REMOVED":
+            message = d.msg || `Candidate removed (ID: ${d.candidateId})`;
+            break;
+
+          case "FAILED_FETCH_WON_SEATS":
+            message = "Checked winning seats (No seats found)";
+            break;
+
+          case "FAILED_ADD_CANDIDATE":
+            message = `Failed to add candidate: ${d.error}`;
+            break;
+
+          case "FAILED_ALLOCATE_CANDIDATE_ELECTION_CONST":
+             message = `Allocation failed: ${d.error}`;
+             break;
+
+          default:
+            // Fallback: Use msg from details, or format the action string
+            message = d.msg || d.message || d.error || row.action.replace(/_/g, ' ');
+        }
+
+        return {
+          actor: row.actor_name,
+          action: row.action,
+          message: message,
+          createdAt: row.timestamp
+        };
+      });
+
+      res.json(activities);
+
+    } catch (err) {
+      console.error("Error fetching recent activity:", err);
+      res.status(500).json({ error: err.message || "Failed to fetch activity" });
     }
-  
+  }
+
+    getCandidateAllocations = async (req, res) => {
+      try {
+          const { candidateId } = req.params;
+          const data = await candConstM.getCandidateAllocations(candidateId);
+          return res.json(data);
+      } catch (err) {
+          console.error(err);
+          return res.status(500).json({ error: err.message || 'Failed to fetch candidate allocations' });
+      }
+  }
    async stats(req,res){
         try {
           const partyId = req.user.id

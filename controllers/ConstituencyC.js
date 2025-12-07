@@ -5,12 +5,7 @@ import auditLogsM from "../models/auditLogsM.js";
   class ConstituencyC{
 getConstituencies = async (req, res) => {
   try {
-    if(await redisClient.exists("AllConstituenciesInfo")){
-      let cachedConstituency= await redisClient.get("AllConstituenciesInfo")
-      return res.json(JSON.parse(cachedConstituency));
-    }
     const constituencies = await ConstituencyM.getAllConstituencies();
-    await redisClient.setEx("AllConstituenciesInfo", 3600, JSON.stringify(constituencies));
     return res.json(constituencies);
   } catch (err) {
     console.error(err);

@@ -1,13 +1,11 @@
 import express from 'express';
-import Parties from '../controllers/partyC.js';
+import partyC from '../controllers/partyC.js'; // standardized import
 import CandidateC from '../controllers/candidateC.js';
 import candidateConstituencyC from '../controllers/candConstC.js';
-
 import { authenicator } from '../middleware/authenicator.js';
+import { upload } from '../utils/imgUloader.js';
+
 const router = express.Router();
-import { upload } from '../utils/imgUloader.js'; // or wherever your file is
-import pool from '../config/db.js';
-import partyC from '../controllers/partyC.js';
 
 /**
  * @swagger
@@ -15,335 +13,96 @@ import partyC from '../controllers/partyC.js';
  *   name: Parties
  *   description: Political party management endpoints
  */
+
 /**
  * @swagger
  * /api/parties/candidates/fighting/elections/{electionId}:
  *   get:
  *     summary: Get all candidates with their fighting constituencies for a specific party and election
  *     tags: [Parties]
- *     security:
- *       - bearerAuth: []
- *     parameters:
- *       - in: path
- *         name: electionId
- *         schema:
- *           type: integer
- *         required: true
- *         description: Election ID to filter candidates
- *     responses:
- *       200:
- *         description: List of candidates with their constituencies
- *         content:
- *           application/json:
- *             schema:
- *               type: array
- *               items:
- *                 type: object
- *                 properties:
- *                   candidateId:
- *                     type: integer
- *                   name:
- *                     type: string
- *                   partyName:
- *                     type: string
- *                   constituency:
- *                     type: string
- *       500:
- *         description: Server error
  */
-router.get('/candidates/fighting/elections/:electionId', authenicator , candidateConstituencyC.getCandConstByPartyAndElection);
+router.get('/candidates/fighting/elections/:electionId', authenicator, candidateConstituencyC.getCandConstByPartyAndElection);
+
 /**
  * @swagger
  * /api/parties/candidates:
  *   get:
  *     summary: Get all registered candidates for a specific party
  *     tags: [Parties]
- *     security:
- *       - bearerAuth: []
- *     responses:
- *       200:
- *         description: List of candidates for the specified party
- *         content:
- *           application/json:
- *             schema:
- *               type: array
- *               items:
- *                 type: object
- *                 properties:
- *                   candidateId:
- *                     type: integer
- *                   name:
- *                     type: string
- *                   constituency:
- *                     type: string
- *       400:
- *         description: Invalid party ID
- *       500:
- *         description: Server error
  */
-router.get('/candidates', authenicator,CandidateC.getCandidatesByPartyId);
+router.get('/candidates', authenicator, CandidateC.getCandidatesByPartyId);
+
 /**
  * @swagger
  * /api/parties/create/candidate:
  *   post:
  *     summary: Create a new candidate
  *     tags: [Parties]
- *     security:
- *       - bearerAuth: []
- *     requestBody:
- *       required: true
- *       content:
- *         multipart/form-data:
- *           schema:
- *             type: object
- *             required:
- *               - UserData
- *               - Candidate
- *               - image
- *             properties:
- *               UserData:
- *                 type: string
- *                 description: JSON string containing user data
- *                 example: '{"name":"John Doe","email":"john@example.com","cnic":"12345-1234567-1","password":"password123","province":"Sindh","city":"Karachi","area":"Clifton"}'
- *               Candidate:
- *                 type: string
- *                 description: JSON string containing candidate data
- *                 example: '{"partyId":1,"manifesto":"My campaign promises..."}'
- *               image:
- *                 type: string
- *                 format: binary
- *                 description: Optional candidate profile image
- *     responses:
- *       200:
- *         description: Candidate created successfully
- *         content:
- *           application/json:
- *             schema:
- *               type: object
- *               properties:
- *                 message:
- *                   type: string
- *                 candidateId:
- *                   type: integer
- *                 imageUploaded:
- *                   type: boolean
- *       400:
- *         description: Invalid input data
- *       500:
- *         description: Server error
  */
 router.post('/create/candidate', authenicator, upload.single('image'), CandidateC.CreateCandidate);
+
 /**
  * @swagger
  * /api/parties/kick/candidate/{candidateId}:
  *   delete:
  *     summary: Remove a candidate from a specific party
  *     tags: [Parties]
- *     security:
- *       - bearerAuth: []
- *     parameters:
- *       - in: path
- *         name: candidateId
- *         schema:
- *           type: integer
- *         required: true
- *         description: ID of the candidate to remove
- *     responses:
- *       200:
- *         description: Candidate removed successfully
- *       400:
- *         description: Invalid party or candidate ID
- *       500:
- *         description: Server error
  */
+router.delete('/kick/candidate/:candidateId', authenicator, CandidateC.kickCandidate);
 
-router.delete('/kick/candidate/:candidateId',authenicator ,CandidateC.kickCandidate);
 /**
  * @swagger
  * /api/parties/account/register:
  *   post:
  *     summary: Create a new party account with image
  *     tags: [Parties]
- *     consumes:
- *       - multipart/form-data
- *     requestBody:
- *       required: true
- *       content:
- *         multipart/form-data:
- *           schema:
- *             type: object
- *             required:
- *               - name
- *               - abbreviation
- *               - email
- *               - password
- *               - image
- *             properties:
- *               name:
- *                 type: string
- *               abbreviation:
- *                 type: string
- *               email:
- *                 type: string
- *                 format: email
- *               password:
- *                 type: string
- *                 format: password
- *               image:
- *                 type: string
- *                 format: binary
- *     responses:
- *       200:
- *         description: Party account created
- *       400:
- *         description: Bad request
- *       500:
- *         description: Server error
  */
+router.post('/account/register', upload.single('image'), partyC.createParty);
 
-router.post('/account/register',upload.single('image'), Parties.createParty);
 /**
  * @swagger
  * /api/parties/account/signin:
  *   post:
  *     summary: Log Party account
  *     tags: [Parties]
- *     requestBody:
- *       required: true
- *       content:
- *         application/json:
- *           schema:
- *             type: object
- *             required:
- *               - email
- *               - password
- *             properties:
- *               email:
- *                 type: string
- *               password:
- *                 type: string
- *     responses:
- *       200:
- *         description: Party account Logged in
- *       400:
- *         description: Bad request
- *       500:
- *         description: Server error
  */
-router.post('/account/signin', Parties.LoginParty);
+router.post('/account/signin', partyC.LoginParty);
+
 /**
  * @swagger
  * /api/parties/account/verify:
  *   post:
  *     summary: Verify Party account
  *     tags: [Parties]
- *     requestBody:
- *       required: true
- *       content:
- *         application/json:
- *           schema:
- *             type: object
- *             required:
- *               - partyId
- *               - otp
- *             properties:
- *               partyId:
- *                 type: integer
- *               otp:
- *                 type: string
- *     responses:
- *       200:
- *         description: Party Verified
- *       400:
- *         description: Bad request
- *       500:
- *         description: Server error
  */
-router.post('/account/verify', Parties.verifyParty);
+router.post('/account/verify', partyC.verifyParty);
+
 /**
  * @swagger
  * /api/parties/candidate/fighting/constituency:
  *   post:
  *     summary: Allocate Candidate Wrt Constituency Seat for Election
  *     tags: [Parties]
- *     security:
- *      - bearerAuth: []
- *     requestBody:
- *       required: true
- *       content:
- *         application/json:
- *           schema:
- *             type: object
- *             required:
- *               - candidateId
- *               - electionId
- *               - constituencyId
- *             properties:
- *               candidateId:
- *                 type: integer
- *               electionId:
- *                 type: integer
- *               constituencyId:
- *                 type: integer
- *     responses:
- *       200:
- *         description: Party account Logged in
- *       400:
- *         description: Bad request
- *       500:
- *         description: Server error
  */
-router.post('/candidate/fighting/constituency',authenicator ,candidateConstituencyC.BookConstituencSeatForElectionForCandidate);
+router.post('/candidate/fighting/constituency', authenicator, candidateConstituencyC.BookConstituencSeatForElectionForCandidate);
+
 /**
  * @swagger
  * /api/parties/candidates/{candidateId}/won/seats:
  *   get:
  *     summary: Get all won seats for a specific candidate
  *     tags: [Parties]
- *     parameters:
- *       - in: path
- *         name: candidateId
- *         required: true
- *         schema:
- *           type: integer
- *         description: ID of the candidate
- *     responses:
- *       200:
- *         description: List of won seats
- *       500:
- *         description: Server error
  */
-router.get('/candidates/:candidateId/won/seats',authenicator ,candidateConstituencyC.GetwonSeats);
+router.get('/candidates/:candidateId/won/seats', authenicator, candidateConstituencyC.GetwonSeats);
+
 /**
  * @swagger
  * /api/parties/candidate/choose/seat:
  *   post:
  *     summary: Choose a seat for a candidate in a specific election and constituency
  *     tags: [Parties]
- *     requestBody:
- *       required: true
- *       content:
- *         application/json:
- *           schema:
- *             type: object
- *             properties:
- *               electionId:
- *                 type: integer
- *                 example: 3
- *               constituencyId:
- *                 type: integer
- *                 example: 12
- *               candidateId:
- *                 type: integer
- *                 example: 45
- *     responses:
- *       200:
- *         description: Seat chosen successfully
- *       500:
- *         description: Failed to choose seat
  */
-
-router.post('/candidate/choose/seat',authenicator ,candidateConstituencyC.ChooseSeat);
+router.post('/candidate/choose/seat', authenicator, candidateConstituencyC.ChooseSeat);
 
 /**
  * @swagger
@@ -351,60 +110,26 @@ router.post('/candidate/choose/seat',authenicator ,candidateConstituencyC.Choose
  *   get:
  *     summary: Get party dashboard statistics
  *     tags: [Parties]
- *     responses:
- *       200:
- *         description: Returns stats for the logged-in party
- *         content:
- *           application/json:
- *             schema:
- *               type: object
- *               properties:
- *                 totalCandidates:
- *                   type: integer
- *                   example: 2
- *                 activeElections:
- *                   type: integer
- *                   example: 1
- *                 allocatedSeats:
- *                   type: integer
- *                   example: 1
- *                 wonSeats:
- *                   type: integer
- *                   example: 1
- *       500:
- *         description: Server error
  */
-
-
 router.get("/stats", authenicator, partyC.stats);
-  /**
+
+/**
  * @swagger
  * /api/parties/recent-activity:
  *   get:
  *     summary: Get recent activity for a party
  *     tags: [Parties]
- *     responses:
- *       200:
- *         description: Recent activity events
- *         content:
- *           application/json:
- *             schema:
- *               type: array
- *               items:
- *                 type: object
- *                 properties:
- *                   actor:
- *                     type: string
- *                   action:
- *                     type: string
- *                   details:
- *                     type: object
- *                   createdAt:
- *                     type: string
  */
-  router.get("/recent-activity", authenicator, partyC.getRecentActivity);
+router.get("/recent-activity", authenicator, partyC.getRecentActivity);
 
-
+/**
+ * @swagger
+ * /api/parties/candidate/{candidateId}/allocations:
+ *   get:
+ *     summary: Get all constituencies a candidate is fighting in
+ *     tags: [Parties]
+ */
+router.get('/candidate/:candidateId/allocations', authenicator, partyC.getCandidateAllocations);
 
 /**
  * @swagger
@@ -412,29 +137,7 @@ router.get("/stats", authenicator, partyC.stats);
  *   get:
  *     summary: Get all winning seats of the logged-in party's candidates
  *     tags: [Parties]
- *     responses:
- *       200:
- *         description: Winning seats retrieved
- *         content:
- *           application/json:
- *             schema:
- *               type: object
- *               properties:
- *                 message:
- *                   type: string
- *                   example: "Won seats retrieved successfully"
- *                 seats:
- *                   type: array
- *                   items:
- *                     type: object
- *                     properties:
- *                       seat_id: { type: integer }
- *                       constituencyid: { type: integer }
- *                       constituency_name: { type: string }
- *                       election_name: { type: string }
- *                       totalvotes: { type: integer }
- *       401: { description: Unauthorized }
- *       500: { description: Failed to fetch winning seats }
  */
-router.get('/candidates/won-seats', authenicator, candidateConstituencyC.GetPartyWonSeats); 
- export default router;
+router.get('/candidates/won-seats', authenicator, candidateConstituencyC.GetPartyWonSeats);
+
+export default router;

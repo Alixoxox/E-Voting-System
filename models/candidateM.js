@@ -62,28 +62,91 @@ class candidateM{
           throw new Error('Error creating candidate: ' + err.message);
         }
       }
-    async getCandidatesByPartyId(partyId){
-        try{
-            const sql=`SELECT c.*, u.name, u.email, u.cnic
-            FROM candidate c
-            JOIN users u ON c.userId = u.id
-            WHERE c.partyId = $1;`
-            const result=await db.query(sql, [partyId]);
-            return result.rows;
-        }catch(err){
+      async getCandidatesByPartyId(partyId) {
+        try {
+            const sql = `
+                SELECT 
+                    c.*, 
+                    u.name, 
+                    u.email, 
+                    u.cnic,
+                    p.name as province,   
+                    ci.name as city,     
+                    a.name as area,      
+                    u.provinceId,
+                    u.cityId,
+                    u.areaId
+                FROM candidate c
+                JOIN users u ON c.userId = u.id
+                LEFT JOIN province p ON u.provinceId = p.id
+                LEFT JOIN city ci ON u.cityId = ci.id
+                LEFT JOIN area a ON u.areaId = a.id
+                WHERE c.partyId = $1
+                ORDER BY c.id DESC;
+            `;
+            const result = await db.query(sql, [partyId]);
+            return result.rows; // Simply return the data
+        } catch (err) {
             console.error('Error fetching candidates by party ID:', err);
             throw new Error('Error fetching candidates by party ID');
         }
     }
-    async kickCandidate(candidateId){
-        try{
-            await db.query(`DELETE FROM candidateconstituency WHERE candidateId = $1`, [candidateId]);
-            await db.query(`DELETE FROM candidate WHERE id = $1`, [candidateId]);
-        }catch(err){
-            console.error('Error kicking candidate:', err);
-            throw new Error('Error kicking candidate');
+    async kickCandidate(candidateId) {
+        const client = await db.connect(); // Get a dedicated client for transaction
+        try {
+            await client.query('BEGIN'); // Start Transaction
+            // 1. FETCH USER ID FIRST
+            // We need this to delete the user account later. 
+            // We must get it before deleting the candidate row.
+            const userRes = await client.query(
+                `SELECT userId FROM candidate WHERE id = $1`, 
+                [candidateId]
+            );
+
+            if (userRes.rows.length === 0) {
+                throw new Error("Candidate not found");
+            }
+            const userId = userRes.rows[0].userid;
+
+            // 2. DELETE VOTES (Dependencies)
+            // Delete votes cast for this candidate in their assigned constituency
+            await client.query(
+                `DELETE FROM votes 
+                 WHERE candidateConstId IN (
+                    SELECT id FROM candidateconstituency WHERE candidateId = $1
+                 )`,
+                [candidateId]
+            );
+
+            // 3. DELETE CONSTITUENCY ALLOCATION
+            await client.query(
+                `DELETE FROM candidateconstituency WHERE candidateId = $1`,
+                [candidateId]
+            );
+
+            // 4. DELETE CANDIDATE PROFILE
+            await client.query(
+                `DELETE FROM candidate WHERE id = $1`,
+                [candidateId]
+            );
+
+            // 5. DELETE USER ACCOUNT (Crucial Step)
+            await client.query(
+                `DELETE FROM users WHERE id = $1`,
+                [userId]
+            );
+
+            await client.query('COMMIT'); // Commit changes
+            return true;
+
+        } catch (err) {
+            await client.query('ROLLBACK'); // Undo everything if error
+            console.error("Error in kickCandidate transaction:", err);
+            throw err;
+        } finally {
+            client.release(); // Release client back to pool
         }
     }
+        
 }
-
 export default new candidateM();

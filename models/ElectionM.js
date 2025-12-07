@@ -22,7 +22,16 @@ class ElectionM{
     }
     async getAllElections(){
         try{
-            const sql=`SELECT * FROM elections;`;
+            const sql=`SELECT 
+    e.id, 
+    e.name, 
+    e.seatType, 
+    e.startDate, 
+    e.status,
+    p.name as province  
+FROM elections e
+LEFT JOIN province p ON e.provinceid = p.id
+ORDER BY e.id DESC;`;
             const result=await db.query(sql);
             return result.rows;
         }catch(err){
@@ -67,9 +76,12 @@ async createElection(name, startDate, endDate, seatType, Province) {
 }
     async getActiveElections(curentDate){
         try{
-            const result= await db.query(`SELECT e.*, p.name as provinceName FROM elections e 
-                left join province p on e.provinceId = p.id 
-                WHERE end_date >= $1 and status='Active' and startDate<=$1;`, [curentDate]);
+            const result= await db.query(`SELECT e.*, COALESCE(p.name, 'National') AS provinceName
+    FROM elections e
+    LEFT JOIN province p ON e.provinceid = p.id
+    WHERE e.status = 'Active'
+      AND e.startdate <= $1
+      AND e.end_date >= $1;`, [curentDate]);
             return result.rows;
         }catch(err){
             console.error('Error fetching active elections:', err);

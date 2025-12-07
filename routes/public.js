@@ -8,6 +8,7 @@ import ConstituencyC from '../controllers/ConstituencyC.js';
 import Parties from '../controllers/partyC.js';
 import userC from '../controllers/userC.js';
 import adminC from '../controllers/adminC.js';
+
 const router = express.Router();
 
 /**
@@ -16,367 +17,84 @@ const router = express.Router();
  *   name: Public
  *   description: Publically Accessible endpoints
  */
+
+// Parties
 /**
  * @swagger
  * /api/public/parties:
  *   get:
  *     summary: Get all political parties
  *     tags: [Public]
- *     responses:
- *       200:
- *         description: List of all political parties
- *         content:
- *           application/json:
- *             schema:
- *               type: array
- *               items:
- *                 type: object
- *                 properties:
- *                   party_id:
- *                     type: integer
- *                   party_name:
- *                     type: string
- *                   party_symbol:
- *                     type: string
- *       500:
- *         description: Server error
  */
 router.get('/parties', Parties.getParties);
 
+// Areas
 /**
  * @swagger
  * /api/public/areas:
  *   get:
  *     summary: Get all areas
  *     tags: [Public]
- *     responses:
- *       200:
- *         description: List of all areas
- *         content:
- *           application/json:
- *             schema:
- *               type: array
- *               items:
- *                 type: object
- *                 properties:
- *                   id:
- *                     type: integer
- *                   name:
- *                     type: string
- *                   city:
- *                     type: string
- *       500:
- *         description: Server error
  */
 router.get('/areas', AreasC.getAreas);
 
+// Cities
 /**
  * @swagger
  * /api/public/cities:
  *   get:
  *     summary: Get all cities
  *     tags: [Public]
- *     responses:
- *       200:
- *         description: List of all cities
- *         content:
- *           application/json:
- *             schema:
- *               type: array
- *               items:
- *                 type: object
- *                 properties:
- *                   city_id:
- *                     type: integer
- *                   city_name:
- *                     type: string
- *                   province_id:
- *                     type: integer
- *       500:
- *         description: Server error
  */
 router.get('/cities', cityC.getCities);
 
+// Dashboard Stats
 /**
  * @swagger
- * /api/public/password/forgot:
- *   post:
- *     summary: Request Password Reset (Sends OTP) (Step 1 password reset) [For both User And Admin]
+ * /api/public/dashboard/stats:
+ *   get:
+ *     summary: Get Command Center Stats
  *     tags: [Public]
- *     requestBody:
- *       required: true
- *       content:
- *         application/json:
- *           schema:
- *             type: object
- *             required: [email, cnic,type]
- *             properties:
- *               email:
- *                 type: string
- *                 format: email
- *               cnic:
- *                 type: string
- *               type:
- *                 type: string
- *                 enum: ["party", "user"]
- *                 example: "party"
- *     responses:
- *       200:
- *         description: OTP sent to email
- *       404:
- *         description: User not found
  */
+router.get('/dashboard/stats', adminC.getDashboardStats);
+
+// Password Reset (Step 1)
 router.post('/password/forgot', userC.forgotPasswordRequest);
-/**
- * @swagger
- * /api/public/password/reset:
- *   post:
- *     summary: Reset Password Using OTP (Step 2 password reset) [For both User And Admin]
- *     tags: [Public]
- *     requestBody:
- *       required: true
- *       content:
- *         application/json:
- *           schema:
- *             type: object
- *             required: [userId, otp, newPassword,type]
- *             properties:
- *               userId:
- *                 type: integer
- *               otp:
- *                 type: string
- *               newPassword:
- *                 type: string
- *                 format: password
- *               type:
- *                  type: string
- *                  enum: ["party", "user"]
- *                  example: "party"
- *     responses:
- *       200:
- *         description: Password updated successfully
- *       400:
- *         description: Invalid OTP
- */
+
+// Password Reset (Step 2)
 router.post('/password/reset', userC.resetPasswordWithOtp);
 
-/**
- * @swagger
- * /api/public/elections:
- *   get:
- *     summary: Get all elections held
- *     tags: [Public]
- *     responses:
- *       200:
- *         description: List of all Elections Held
- *         content:
- *           application/json:
- *             schema:
- *               type: array
- *               items:
- *                 type: object
- *                 
- *       500:
- *         description: Server error
- */
+// Elections
 router.get('/elections', ElectionC.getElections);
-/**
- * @swagger
- * /api/public/candidates:
- *   get:
- *     summary: Get all registered candidates
- *     tags: [Public]
- *     responses:
- *       200:
- *         description: List of all candidates
- *       500:
- *         description: Server error
- */
 
+// Candidates
 router.get('/candidates', CandidateC.getCandidates);
-/**
- * @swagger
- * /api/public/province:
- *   get:
- *     summary: Get all provinces
- *     tags: [Public]
- *     responses:
- *       200:
- *         description: List of all provinces
- *         content:
- *           application/json:
- *             schema:
- *               type: array
- *               items:
- *                 type: object
- *                 properties:
- *                   id:
- *                     type: integer
- *                   name:
- *                     type: string
- *       500:
- *         description: Server error
- */
+
+// Provinces
 router.get('/province', ProvinceC.getProvinces);
 
-
-/**
- * @swagger
- * /api/public/constituencies:
- *   get:
- *     summary: Get all constituencies
- *     tags: [Public]
- *     responses:
- *       200:
- *         description: List of all constituencies
- *         content:
- *           application/json:
- *             schema:
- *               type: array
- *               items:
- *                 type: object
- *       500:
- *         description: Server error
- */
+// Constituencies
 router.get('/constituencies', ConstituencyC.getConstituencies);
-/**
- * @swagger
- * /api/public/area/constituency/{constituencyid}:
- *   get:
- *     summary: Get areas by Constituency ID
- *     tags: [Public]
- *     parameters:
- *       - in: path
- *         name: constituencyid
- *         required: true
- *         schema:
- *           type: integer
- *         description: ID of the constituency to fetch its areas
- *     responses:
- *       200:
- *         description: Areas retrieved successfully
- *         content:
- *           application/json:
- *             schema:
- *               type: array
- *               items:
- *                 type: object
- *       400:
- *         description: Missing or invalid constituency ID
- *       500:
- *         description: Server error while fetching areas
- */
 
+// Areas by Constituency
 router.get('/area/constituency/:constituencyid', ConstituencyC.getAreaByConstituency);
 
-/**
- * @swagger
- * /api/public/active/Elections:
- *   get:
- *     summary: Get Active Elections being Held
- *     tags: [Public]
- *     responses:
- *       200:
- *         description: Currently Active Elections Data returned
- *         content:
- *           application/json:
- *             schema:
- *               type: array
- *               items:
- *                 type: object
- *       500:
- *         description: Failed to fetch Elections Data
- */
+// Active Elections
 router.get('/active/Elections', ElectionC.getActiveElections);
 
-/**
- * @swagger
- * /api/public/resend/otp:
- *   post:
- *     summary: Resend Verification/MFA OTP
- *     description: Sends a new OTP to the user's email with cooldown and rate limit protection [For user, party and admin].
- *     tags: [Public]
- *     requestBody:
- *       required: true
- *       content:
- *         application/json:
- *           schema:
- *             type: object
- *             required: [userId, email]
- *             properties:
- *               userId:
- *                 type: integer
- *                 example: 55
- *               email:
- *                 type: string
- *                 format: email
- *                 example: "user@example.com"
- *     responses:
- *       200:
- *         description: OTP resent successfully.
- *       429:
- *         description: Too many requests – cooldown/rate limit triggered.
- *       500:
- *         description: Failed to send email.
- */
+// Resend OTP
 router.post('/resend/otp', userC.resendOtp);
-/**
- * @swagger
- * /api/public/elections/past-results:
- *   get:
- *     summary: Get past elections and winners
- *     tags: [Public]
- *     responses:
- *       200:
- *         description: List of ended elections with winners
- *         content:
- *           application/json:
- *             schema:
- *               type: array
- *               items:
- *                 type: object
- *                 properties:
- *                   name: { type: string }
- *                   endDate: { type: string, format: date }
- *                   winners:
- *                     type: array
- *                     items:
- *                       type: object
- *                       properties:
- *                         candidate_name: { type: string }
- *                         party_name: { type: string }
- */
+
+// Past Results
 router.get('/elections/past-results', ElectionC.getPastResults);
-/**
- * @swagger
- * /api/public/active/constituencies/provisional:
- *   get:
- *     summary: Get all active provisional constituencies
- *     tags: [Public]
- *     responses:
- *       200: { description: List retrieved successfully }
- *       500: { description: Server error }
- */
+
+// Active Provisional Constituencies
 router.get('/active/constituencies/provisional', adminC.fetchAtiveProvisionalConstituencies);
 
-/**
- * @swagger
- * /api/public/active/constiuencies/national:
- *   get:
- *     summary: Get all active national constituencies
- *     tags: [Public]
- *     responses:
- *       200: { description: List retrieved successfully }
- *       500: { description: Server error }
- */
+// Active National Constituencies
 router.get('/active/constiuencies/national', adminC.fetchActiveNationalConstituencies);
-/**
- * @swagger
- * /api/public/health:
- *   get:
- *     summary: Get Health Stats
- *     tags: [Public]
- *     responses: { 200: { description: "Health Stats" } }
- */
+
+// Health Check
 router.get('/health', adminC.healthCheck);
+
 export default router;

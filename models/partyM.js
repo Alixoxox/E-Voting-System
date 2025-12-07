@@ -93,9 +93,7 @@ class partyM{
           if (party.approvalstatus === 'Rejected') {
             throw new Error('Your account has been rejected by the admin.');
           }
-      
-          console.log('Comparing passwords:', password, party.password);
-          let isMatch = await bcrypt.compare(password, party.password);
+            let isMatch = await bcrypt.compare(password, party.password);
           if(!isMatch){
             throw new Error('Invalid password');
           }
